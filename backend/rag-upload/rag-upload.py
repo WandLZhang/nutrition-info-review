@@ -1,193 +1,146 @@
 import os
-import xml.etree.ElementTree as ET
 import json
-import hashlib
 from google.cloud import discoveryengine
-from google.api_core import retry
+from google.api_core import retry, client_options
 from google.api_core.exceptions import NotFound, PermissionDenied, ResourceExhausted, AlreadyExists
-from google.protobuf import field_mask_pb2
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
 
-class XMLProcessor:
-    def __init__(self, project_id, location):
+class DatastoreUploader:
+    def __init__(self, project_id, collection, data_store_id):
         self.project_id = project_id
-        self.location = location
+        self.collection = collection
+        self.data_store_id = data_store_id
         self.client = discoveryengine.DataStoreServiceClient()
         self.doc_client = discoveryengine.DocumentServiceClient()
-
-    def explore(self, root: ET.Element, text: list[str], metadata: dict[str, dict[str, str]]):
-        if root.attrib:
-            for key, value in root.attrib.items():
-                if key == "id":
-                    text.append("")
-                    person = metadata.get("participants", {}).get(value, "Unknown")
-                    line = f"{person}:"
-                elif key == "type" and value.lower() == "q":
-                    line = "Question:"
-                elif key == "type" and value.lower() == "a":
-                    line = "Answer:"
-                else:
-                    line = f"{key}: {value}"
-                if line:
-                    text.append(line.strip())
-        if root.tag == "HEAD" and root.text:
-            text.append(root.text.strip())    
-        if root.tag == "P" and root.text and root.text.strip() != "":
-            text.append(root.text.strip())
-        if root.tag == "CITA":
-            text.append(ET.tostring(root, encoding='unicode').strip())
-        if root.tag == "TABLE":
-            text.append(ET.tostring(root, encoding='unicode').strip())
-        for element in root:
-            self.explore(element, text, metadata)
-
-    def process_xml(self, xml_file_path):
-        tree = ET.parse(xml_file_path)
-        root = tree.getroot()
-        
-        document_chunks = {}
-        visited = set()
-
-        def process_div(div, parent_names=None):
-            if parent_names is None:
-                parent_names = []
-
-            head = div.find("HEAD")
-            if head is not None and head.text:
-                current_name = head.text.strip()
-                names = parent_names + [current_name]
-            else:
-                names = parent_names
-
-            if div.attrib.get("TYPE") == "SECTION":
-                section_id = div.attrib.get("N", "")
-                if section_id and section_id not in visited:
-                    visited.add(section_id)
-                    text_content = []
-                    self.explore(div, text_content, {})
-                    section_name = " - ".join(names)
-                    document_chunks[(section_id, section_name)] = "\n".join(text_content)
-            else:
-                for child_div in div:
-                    if child_div.tag.startswith("DIV"):
-                        process_div(child_div, names)
-
-        for div1 in root.findall("DIV1"):
-            process_div(div1)
-
-        return document_chunks
+        self.parent = f"projects/{self.project_id}/locations/global/collections/{self.collection}/dataStores/{self.data_store_id}/branches/default_branch"
 
     @retry.Retry()
-    def get_or_create_datastore(self, collection, data_store_id):
-        parent = f"projects/{self.project_id}/locations/global/collections/{collection}"
-        data_store_name = f"{parent}/dataStores/{data_store_id}"
+    def create_datastore(self):
+        parent = f"projects/{self.project_id}/locations/global/collections/{self.collection}"
         
-        try:
-            existing_datastore = self.client.get_data_store(name=data_store_name)
-            print(f"Data Store {data_store_id} already exists.")
-            if existing_datastore.content_config == discoveryengine.DataStore.ContentConfig.CONTENT_REQUIRED:
-                print("Existing Data Store has the correct content configuration.")
-                return existing_datastore
-            else:
-                print("Existing Data Store has incorrect content configuration. Creating a new one.")
-                new_data_store_id = f"{data_store_id}_content_required"
-                return self.create_datastore(collection, new_data_store_id)
-        except NotFound:
-            print(f"Data Store {data_store_id} not found. Creating a new one.")
-            return self.create_datastore(collection, data_store_id)
-
-    @retry.Retry()
-    def create_datastore(self, collection, data_store_id):
-        parent = f"projects/{self.project_id}/locations/global/collections/{collection}"
-        
-        print(f"Creating Data Store {data_store_id} in parent {parent}...")
-
         data_store = discoveryengine.DataStore()
-        data_store.display_name = data_store_id
+        data_store.display_name = self.data_store_id
         data_store.industry_vertical = "GENERIC"
         data_store.solution_types = ["SOLUTION_TYPE_SEARCH"]
         data_store.content_config = discoveryengine.DataStore.ContentConfig.CONTENT_REQUIRED
 
-        data_store.document_processing_config = discoveryengine.DocumentProcessingConfig()
-        data_store.document_processing_config.default_parsing_config = discoveryengine.DocumentProcessingConfig.ParsingConfig()
-        data_store.document_processing_config.default_parsing_config.digital_parsing_config = discoveryengine.DocumentProcessingConfig.ParsingConfig.DigitalParsingConfig()
-
         try:
             operation = self.client.create_data_store(
                 parent=parent,
-                data_store_id=data_store_id,
+                data_store_id=self.data_store_id,
                 data_store=data_store
             )
             response = operation.result()
             print(f"Data Store created: {response.name}")
             return response
         except AlreadyExists:
-            print(f"Data Store {data_store_id} already exists. Retrieving existing Data Store.")
-            return self.client.get_data_store(name=f"{parent}/dataStores/{data_store_id}")
-        except PermissionDenied:
-            print("Permission denied. Please check your credentials and project permissions.")
-            raise
-        except ResourceExhausted:
-            print("Resource quota exceeded. Please check your project quotas.")
-            raise
+            print(f"Data Store {self.data_store_id} already exists. Using existing Data Store.")
+            return self.client.get_data_store(name=f"{parent}/dataStores/{self.data_store_id}")
 
-    def generate_document_id(self, section_id: str, section_name: str) -> str:
-        clean_section_id = ''.join(c for c in section_id if c.isalnum())
-        
-        if not clean_section_id or not clean_section_id[0].isalpha():
-            clean_section_id = 'S' + clean_section_id
-        
-        combined = f"{clean_section_id}_{section_name}"
-        
-        if len(combined) <= 63:
-            return combined
-        
-        hash_object = hashlib.md5(combined.encode())
-        hash_str = hash_object.hexdigest()
-        
-        return f"{clean_section_id[:7]}_{hash_str}"[:63]
+    @retry.Retry(predicate=retry.if_exception_type(
+        ResourceExhausted,
+        PermissionDenied,
+    ))
+    def upload_document(self, file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            doc_data = json.load(f)
 
-    @retry.Retry()
-    def upload_to_datastore(self, document_chunks, collection, data_store_id, branch="default_branch"):
-        parent = f"projects/{self.project_id}/locations/global/collections/{collection}/dataStores/{data_store_id}/branches/{branch}"
+        document = discoveryengine.Document()
+        document.id = doc_data['id']
+        document.content = discoveryengine.Document.Content()
+        document.content.raw_bytes = doc_data['content'].encode('utf-8')
+        document.content.mime_type = "text/plain"
+        document.struct_data = {
+            "section_id": doc_data['section_id'],
+            "section_name": doc_data['section_name'],
+        }
 
-        print(f"Uploading documents to parent {parent}...")
+        try:
+            response = self.doc_client.create_document(
+                parent=self.parent,
+                document=document,
+                document_id=document.id
+            )
+            verification_result = self.verify_document(document.id, doc_data)
+            return f"Document created: {response.name}\nVerification: {verification_result}"
+        except AlreadyExists:
+            return f"Document {document.id} already exists. Skipping."
+        except Exception as e:
+            return f"Error creating document {document.id}: {str(e)}"
 
-        for (section_id, section_name), content in document_chunks.items():
-            document = discoveryengine.Document()
-            document.id = self.generate_document_id(section_id, section_name)
-            document.content = discoveryengine.Document.Content()
-            document.content.raw_bytes = content.encode('utf-8')
-            document.content.mime_type = "text/plain"
-            document.struct_data = {
-                "section_id": section_id,
-                "section_name": section_name,
-            }
+    @retry.Retry(predicate=retry.if_exception_type(
+        ResourceExhausted,
+        PermissionDenied,
+    ))
+    def verify_document(self, document_id, original_data):
+        try:
+            name = f"{self.parent}/documents/{document_id}"
+            retrieved_document = self.doc_client.get_document(name=name)
+            
+            verification_results = []
+            if retrieved_document.id == original_data['id']:
+                verification_results.append("ID: Matched")
+            else:
+                verification_results.append("ID: Mismatch")
+            
+            if retrieved_document.struct_data.get('section_id') == original_data['section_id']:
+                verification_results.append("Section ID: Matched")
+            else:
+                verification_results.append("Section ID: Mismatch")
+            
+            if retrieved_document.struct_data.get('section_name') == original_data['section_name']:
+                verification_results.append("Section Name: Matched")
+            else:
+                verification_results.append("Section Name: Mismatch")
+            
+            original_content_length = len(original_data['content'])
+            retrieved_content_length = len(retrieved_document.content.raw_bytes)
+            if original_content_length == retrieved_content_length:
+                verification_results.append(f"Content: Length Matched ({original_content_length} bytes)")
+            else:
+                verification_results.append(f"Content: Length Mismatch (Original: {original_content_length}, Retrieved: {retrieved_content_length})")
+            
+            return ", ".join(verification_results)
+        except Exception as e:
+            return f"Verification failed: {str(e)}"
 
-            try:
-                response = self.doc_client.create_document(
-                    parent=parent,
-                    document=document,
-                    document_id=document.id
-                )
-                print(f"Document created: {response.name}")
-            except discoveryengine.exceptions.BadRequest as e:
-                print(f"Bad Request Error creating document: {e}")
-            except discoveryengine.exceptions.AlreadyExists as e:
-                print(f"Document already exists: {e}")
-            except Exception as e:
-                print(f"Unexpected error creating document: {e}")
+    def upload_documents(self, directory, max_workers=5):
+        self.create_datastore()
+        # Engine creation is commented out
+        # self.create_engine()
 
-    def process_and_upload(self, xml_file_path, collection, data_store_id):
-        chunks = self.process_xml(xml_file_path)
-        datastore = self.get_or_create_datastore(collection, data_store_id)
-        self.upload_to_datastore(chunks, collection, datastore.name.split('/')[-1])
+        file_paths = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.json')]
+        total_files = len(file_paths)
+
+        results = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_file = {executor.submit(self.upload_document, file_path): file_path for file_path in file_paths}
+            
+            with tqdm(total=total_files, desc="Uploading documents") as pbar:
+                for future in as_completed(future_to_file):
+                    file_path = future_to_file[future]
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception as e:
+                        results.append(f"Error processing {file_path}: {str(e)}")
+                    pbar.update(1)
+
+        return results
+
+def main():
+    project_id = "gemini-med-lit-review"
+    collection = "default_collection"
+    data_store_id = "fda-title21_6"
+    processed_documents_dir = "processed_documents"
+
+    uploader = DatastoreUploader(project_id, collection, data_store_id)
+    results = uploader.upload_documents(processed_documents_dir)
+
+    print("\nUpload Results:")
+    for result in results:
+        print(result)
 
 if __name__ == "__main__":
-    project_id = "gemini-med-lit-review"
-    location = "us-central1"
-    xml_file_path = "title21.xml"
-    collection = "default_collection"
-    data_store_id = "fda-title21"
-
-    processor = XMLProcessor(project_id, location)
-    processor.process_and_upload(xml_file_path, collection, data_store_id)
+    main()
