@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>FDA Inspection Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>FDA Inspection Assistant</h1>
+            <div id="connectionStatus" aria-live="polite"></div>
+        </header>
+        
+        <main>
+            <section class="control-panel">
+                <label for="facilityType">Facility Type:</label>
+                <input type="text" id="facilityType" placeholder="Enter facility type">
+                <button id="connectButton">Connect</button>
+            </section>
+
+            <section class="video-container">
+                <video id="videoElement" autoplay playsinline></video>
+                <canvas id="canvasElement"></canvas>
+            </section>
+
+            <section class="inspection-panel">
+                <textarea id="topicsList" rows="5" readonly placeholder="Inspection topics will appear here"></textarea>
+                <div class="button-group">
+                    <button id="startInspection">Start Inspection</button>
+                    <button id="stopInspection">Stop Inspection</button>
+                </div>
+            </section>
+
+            <section class="query-panel">
+                <label for="userQuery">Query:</label>
+                <input type="text" id="userQuery" placeholder="Enter your query">
+                <button id="sendQuery">Send Query</button>
+            </section>
+
+            <section id="output" aria-live="polite"></section>
+        </main>
+
+        <footer>
+            <p>&copy; 2023 FDA Inspection Assistant. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

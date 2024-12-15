@@ -1,0 +1,8 @@
+websockets
+google-cloud-aiplatform==1.74.0
+google-cloud-discoveryengine==0.13.5
+opencv-python
+numpy==1.26.2
+Pillow
+google-genai
+google-ai-generativelanguage==0.6.10
