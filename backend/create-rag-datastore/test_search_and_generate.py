@@ -26,7 +26,7 @@ def search_datastore(query: str) -> list:
     request = discoveryengine.SearchRequest(
         serving_config=serving_config,
         query=query,
-        page_size=10,  # Reduced page size
+        page_size=10,
         query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
             condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO
         ),
@@ -71,21 +71,20 @@ def process_search_results(search_results: list, target_string: str) -> list:
     for i, result in enumerate(search_results):
         logging.debug(f"Processing search result {i+1}: {result}")
 
-        doc_id = extract_safe(result, 'id')
-        section_id = extract_safe(result, 'document', 'struct_data', 'fields', 'section_id', 'string_value')
-        section_name = extract_safe(result, 'document', 'struct_data', 'fields', 'section_name', 'string_value')
-        
-        # Retrieve full document content
+        doc_id = extract_safe(result, 'document', 'id')
         full_doc = get_document_by_id(doc_id)
+        
         if full_doc and full_doc.content and full_doc.content.raw_bytes:
             content = full_doc.content.raw_bytes.decode('utf-8')
+            section_id = full_doc.struct_data.get('section_id', 'N/A')
+            section_name = full_doc.struct_data.get('section_name', 'N/A')
             
             if any(word.lower() in content.lower() for word in target_string.split()):
                 matching_documents.append({
                     'id': doc_id,
-                    'section_id': section_id or "Unknown ID",
-                    'section': section_name or "Unknown Section",
-                    'content': content[:500]  # Limit content to first 500 characters
+                    'section_id': section_id,
+                    'section': section_name,
+                    'content': content[:500]
                 })
         else:
             logging.warning(f"No content found for document {doc_id}")
