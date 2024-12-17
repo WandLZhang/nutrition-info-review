@@ -110,34 +110,52 @@ function sendFacilityType() {
 
 function captureAndSendFrames() {
     const context = canvasElement.getContext('2d');
-    canvasElement.width = videoElement.videoWidth;
-    canvasElement.height = videoElement.videoHeight;
 
     function sendFrame() {
+        console.log('Attempting to capture frame...');
+
         if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
-            context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-            canvasElement.toBlob(function(blob) {
-                if (blob) {
-                    const reader = new FileReader();
-                    reader.onloadend = function() {
-                        const base64data = reader.result.split(',')[1];
-                        socket.send(JSON.stringify({ video_frame: base64data }));
-                    };
-                    reader.readAsDataURL(blob);
-                } else {
-                    console.warn('Failed to create blob from canvas');
-                }
-            }, 'image/jpeg');
+            console.log('Video ready state: HAVE_ENOUGH_DATA');
+            console.log(`Video dimensions: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
+
+            // Ensure video has valid dimensions
+            if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+
+                context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+                console.log('Frame drawn to canvas');
+
+                canvasElement.toBlob(function(blob) {
+                    if (blob) {
+                        console.log(`Blob created successfully. Size: ${blob.size} bytes`);
+                        const reader = new FileReader();
+                        reader.onloadend = function() {
+                            const base64data = reader.result.split(',')[1];
+                            console.log('Base64 data created. Sending to server...');
+                            socket.send(JSON.stringify({ video_frame: base64data }));
+                        };
+                        reader.onerror = function(error) {
+                            console.error('Error reading blob:', error);
+                        };
+                        reader.readAsDataURL(blob);
+                    } else {
+                        console.error('Failed to create blob from canvas');
+                    }
+                }, 'image/jpeg', 0.95);  // Specify image format and quality
+            } else {
+                console.warn('Video dimensions are invalid. Skipping frame capture.');
+            }
         } else {
-            console.warn('Video not ready');
+            console.warn(`Video not ready. Current state: ${videoElement.readyState}`);
         }
     }
 
-    const frameInterval = setInterval(sendFrame, 1000); // Send a frame every second
+    const frameInterval = setInterval(sendFrame, 1000);
 
-    // Clear interval when stopping inspection
     stopInspectionButton.addEventListener('click', () => {
         clearInterval(frameInterval);
+        console.log('Frame capture stopped');
     });
 }
 
