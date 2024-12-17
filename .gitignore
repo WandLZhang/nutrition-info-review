@@ -1,7 +1,5 @@
 backend/archive
 backend/create-rag-datastore/processed_documents
-backend/fda-inspect/test1/backend/venv
-backend/fda-inspect/test1/backend/service-account-key.json
-backend/fda-inspect/test1/backend/__pycache__
+backend/fda-inspect/test1/
 backend/fda-inspect/test2/.env
 backend/fda-inspect/test2/__pycache__
