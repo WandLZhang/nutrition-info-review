@@ -3,4 +3,6 @@ backend/create-rag-datastore/processed_documents
 backend/fda-inspect/test1/
 backend/fda-inspect/test2/.env
 backend/fda-inspect/test2/__pycache__
-frontend/test/template_app.txt  
+backend/fda-inspect/test2/captured_images/*
+backend/fda-inspect/test2/output_images/*
+frontend/test/template_app.txt
