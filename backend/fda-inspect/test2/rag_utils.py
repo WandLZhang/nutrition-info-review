@@ -83,7 +83,7 @@ def process_search_results(search_results: list, target_string: str) -> list:
                     'id': doc_id,
                     'section_id': section_id,
                     'section': section_name,
-                    'content': content[:500]
+                    'content': content
                 })
         else:
             logging.warning(f"No content found for document {doc_id}")

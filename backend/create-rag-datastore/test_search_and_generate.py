@@ -92,7 +92,7 @@ def process_search_results(search_results: list, target_string: str) -> list:
     return matching_documents
 
 def main():
-    target_string = "A manufacturer shall ensure that any system that is modified is revalidated"
+    target_string = "Wearing, where appropriate, in an effective manner, hair nets, headbands, caps, beard covers, or other effective hair restraints."
     query = target_string
 
     logging.info(f"Searching for documents containing: '{target_string}'")
@@ -119,7 +119,7 @@ def main():
             print(f"ID: {specific_doc.id}")
             print(f"Section ID: {specific_doc.struct_data.get('section_id', 'N/A')}")
             print(f"Section Name: {specific_doc.struct_data.get('section_name', 'N/A')}")
-            print(f"Content: {specific_doc.content.raw_bytes.decode('utf-8')[:500]}...")
+            print(f"Content: {specific_doc.content.raw_bytes.decode('utf-8')}...")
         else:
             print(f"\nFailed to retrieve the specific document with ID: {specific_doc_id}")
     else:

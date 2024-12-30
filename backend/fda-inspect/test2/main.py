@@ -19,10 +19,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-api_key = os.getenv('GOOGLE_API_KEY')
-if not api_key:
-    raise ValueError("GOOGLE_API_KEY not found in .env file")
-
 MODEL = "gemini-2.0-flash-exp"
 
 class InspectionApp:
@@ -32,10 +28,15 @@ class InspectionApp:
             project="gemini-med-lit-review",
             location="us-central1"
         )
+        self.model = "gemini-2.0-flash-exp"
+        self.tools = [types.Tool(google_search=types.GoogleSearch())]
+        
         self.cap = cv2.VideoCapture(0)
         self.image_dir = "captured_images"
         os.makedirs(self.image_dir, exist_ok=True)
-        vertexai.init(project="wz-genai", location="us-central1")
+        
+        # Initialize Vertex AI for the second model
+        vertexai.init(project="gemini-med-lit-review", location="us-central1")
         self.gemini_model = GenerativeModel(
             "gemini-1.5-flash-001",
             tools=[Tool.from_google_search_retrieval(
@@ -90,23 +91,36 @@ class InspectionApp:
             )
         ]
 
-        generate_content_config = types.GenerateContentConfig(
-            temperature=0.2,
-            top_p=0.95,
-            max_output_tokens=8192,
-            response_modalities=["TEXT"],
-            safety_settings=[
-                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF"),
-            ],
-        )
-
         response = self.client.models.generate_content(
-            model=MODEL,
+            model=self.model,
             contents=contents,
-            config=generate_content_config,
+            config=types.GenerateContentConfig(
+                temperature=1,
+                top_p=0.95,
+                max_output_tokens=8192,
+                response_modalities=["TEXT"],
+                safety_settings=[
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_HATE_SPEECH",
+                        threshold="OFF"
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                        threshold="OFF"
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        threshold="OFF"
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_HARASSMENT",
+                        threshold="OFF"
+                    )
+                ],
+                tools=self.tools,
+                system_instruction=[types.Part.from_text("""Return bounding boxes as a JSON array with labels. Never return masks or code fencing. Limit to 25 objects.
+If an object is present multiple times, name them according to their unique characteristic (colors, size, position, unique characteristics, etc..).""")]
+            )
         )
 
         return self.format_response(response.text)
@@ -210,10 +224,18 @@ class InspectionApp:
         outline_thickness = 5
 
         try:
+            # Try to load Arial font
             font = ImageFont.truetype("Arial.ttf", 36)
-        except IOError:
-            font = ImageFont.load_default()
-            font = ImageFont.font.Font(font, 36)
+        except OSError:
+            try:
+                # Try system-specific default font paths
+                if os.name == 'nt':  # Windows
+                    font = ImageFont.truetype("C:\\Windows\\Fonts\\arial.ttf", 36)
+                else:  # Linux/Mac
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 36)
+            except OSError:
+                # If all else fails, use default font
+                font = ImageFont.load_default()
 
         y1, x1, y2, x2 = citation['box_2d']
         x1 = int(x1 * width / 1000)
@@ -224,12 +246,21 @@ class InspectionApp:
         for i in range(outline_thickness):
             draw.rectangle([x1+i, y1+i, x2-i, y2-i], outline=color)
 
+        # Draw text at top of image, independent of bounding box
         label = f"Section {verified_section}"
         text_bbox = draw.textbbox((0, 0), label, font=font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
-        draw.rectangle([x1, y1-text_height-10, x1+text_width+10, y1], fill='white')
-        draw.text((x1+5, y1-text_height-5), label, fill=color, font=font)
+        
+        # Fixed position at top of image
+        text_x = 10  # Left margin
+        text_y = 10  # Top margin
+        
+        # Draw white background for text
+        draw.rectangle([text_x, text_y, text_x + text_width + 20, text_y + text_height + 10], fill='white')
+        
+        # Draw text
+        draw.text((text_x + 10, text_y + 5), label, fill=color, font=font)
 
         output_path = f"citation_{index+1}.jpg"
         img.save(output_path)
