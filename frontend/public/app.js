@@ -19,6 +19,9 @@ let isRecording = false;
 let currentView = null;
 let mediaStream = null;
 let recognition = null;
+let capturedImage = null;
+const retakeButton = document.getElementById('retakeButton');
+const fileInput = document.getElementById('fileInput');
 
 // Initialize Speech Recognition
 if ('webkitSpeechRecognition' in window) {
@@ -192,16 +195,23 @@ function toggleMicrophone() {
     }
 }
 
-// Process Inspection
-async function processInspection() {
+// Handle file upload
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            capturedImage = e.target.result;
+            showPreview(capturedImage);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Capture frame
+function captureFrame() {
     if (!isCameraOn) {
         alert('Please turn on the camera first.');
-        return;
-    }
-
-    const background = inspectionInput.value.trim();
-    if (!background) {
-        alert('Please provide inspection background information.');
         return;
     }
 
@@ -213,19 +223,73 @@ async function processInspection() {
     ctx.drawImage(camera, 0, 0);
 
     // Get base64 image data
-    const imageData = canvas.toDataURL('image/jpeg');
+    capturedImage = canvas.toDataURL('image/jpeg');
+    showPreview(capturedImage);
+}
+
+// Show preview
+function showPreview(imageData) {
+    // Show preview
+    const preview = document.createElement('img');
+    preview.src = imageData;
+    preview.className = 'absolute inset-0 w-full h-full object-contain bg-black';
+    preview.id = 'preview';
+    
+    // Remove any existing preview
+    const existingPreview = document.getElementById('preview');
+    if (existingPreview) {
+        existingPreview.remove();
+    }
+    
+    // Add preview to camera container
+    camera.parentElement.appendChild(preview);
+    
+    // Show retake button, hide capture button
+    captureButton.classList.add('hidden');
+    retakeButton.classList.remove('hidden');
+}
+
+// Retake photo
+function retakePhoto() {
+    // Remove preview
+    const preview = document.getElementById('preview');
+    if (preview) {
+        preview.remove();
+    }
+    
+    // Show capture button, hide retake button
+    captureButton.classList.remove('hidden');
+    retakeButton.classList.add('hidden');
+    
+    // Clear captured image and file input
+    capturedImage = null;
+    fileInput.value = '';
+}
+
+// Process Inspection
+async function processInspection() {
+    if (!capturedImage) {
+        alert('Please capture a photo first.');
+        return;
+    }
+
+    const background = inspectionInput.value.trim();
+    if (!background) {
+        alert('Please provide inspection background information.');
+        return;
+    }
 
     try {
         processButton.disabled = true;
         processButton.textContent = 'Processing...';
 
-        const response = await fetch('https://processinspection-jlrwvtesnq-uc.a.run.app', {
+        const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                image: imageData,
+                image: capturedImage,
                 background: background
             })
         });
@@ -265,6 +329,8 @@ function displayCitations(citations) {
 // Event Listeners
 cameraToggle.addEventListener('click', toggleCamera);
 micButton.addEventListener('click', toggleMicrophone);
+captureButton.addEventListener('click', captureFrame);
+retakeButton.addEventListener('click', retakePhoto);
 processButton.addEventListener('click', processInspection);
 
 // Initialize first view

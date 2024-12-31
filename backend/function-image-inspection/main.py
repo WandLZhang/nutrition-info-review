@@ -12,9 +12,8 @@ from google.cloud import discoveryengine
 from google.api_core import retry
 from google.api_core.exceptions import NotFound, PermissionDenied, ResourceExhausted
 import vertexai
-from vertexai.preview.generative_models import GenerativeModel, Part, SafetySetting, Tool
-from vertexai.preview.generative_models import grounding
-from flask import jsonify
+from vertexai.preview.generative_models import GenerativeModel, Part, SafetySetting, Tool, grounding
+from flask import jsonify, request
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -30,17 +29,23 @@ search_client = discoveryengine.SearchServiceClient(client_options=client_option
 doc_client = discoveryengine.DocumentServiceClient(client_options=client_options)
 
 # Initialize Vertex AI clients
-vertexai.init(project="gemini-med-lit-review", location="us-central1")
+# For Gemini 2.0
 genai_client = genai.Client(
+    vertexai=True,
     project="gemini-med-lit-review",
     location="us-central1"
 )
-model = genai_client.get_model("gemini-2.0-flash-exp")
+
+# For Gemini 1.5
+vertexai.init(project="gemini-med-lit-review", location="us-central1")
+tools = [
+    Tool.from_google_search_retrieval(
+        google_search_retrieval=grounding.GoogleSearchRetrieval()
+    )
+]
 gemini_model = GenerativeModel(
     "gemini-1.5-flash-001",
-    tools=[Tool.from_google_search_retrieval(
-        google_search_retrieval=grounding.GoogleSearchRetrieval()
-    )],
+    tools=tools
 )
 
 # RAG Utility Functions
@@ -359,13 +364,13 @@ def process_inspection(request):
     try:
         request_json = request.get_json()
         if not request_json:
-            return ('No JSON data received', 400, headers)
+            return jsonify({'error': 'No JSON data received'}), 400, headers
 
         image_data = request_json.get('image', '').split(',')[1]  # Remove data URL prefix
         inspection_type = request_json.get('background', '')
 
         if not image_data or not inspection_type:
-            return ('Missing required fields', 400, headers)
+            return jsonify({'error': 'Missing required fields'}), 400, headers
 
         # Generate initial response
         initial_response = generate_initial_response(inspection_type, image_data)
@@ -380,3 +385,10 @@ def process_inspection(request):
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         return (jsonify({"error": str(e)}), 500, headers)
+
+if __name__ == "__main__":
+    # This is used when running locally only. When deploying to Google Cloud Functions,
+    # a webserver will be used to run the app instead
+    app = functions_framework.create_app(target="process_inspection")
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host="0.0.0.0", port=port, debug=True)
