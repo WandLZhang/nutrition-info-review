@@ -33,12 +33,18 @@
         <div id="precheckView" class="hidden">
             <div class="mb-4">
                 <select id="coordinates" 
-                        class="w-full p-2 border rounded shadow-sm bg-white cursor-pointer">
+                        class="w-full p-2 border rounded shadow-sm bg-white cursor-pointer"
+                        data-coordinates='[
+                            {"name": "American Foods Group, LLC - Long Prairie Packing Co", "address": "10 Riverside Dr, Long Prairie, MN 56347", "lat": 45.9735, "lon": -94.8676},
+                            {"name": "Oscar Mayers Packing", "address": "2099 Roth St, Madison, WI 53704", "lat": 43.1166, "lon": -89.3471},
+                            {"name": "Create-A-Pack Foods Inc", "address": "W1344 Industrial Dr, Ixonia, WI 53036", "lat": 43.1397, "lon": -88.5891},
+                            {"name": "HyLife Foods", "address": "2850 MN-60, Windom, MN 56101", "lat": 43.8644, "lon": -95.1172}
+                        ]'>
                     <option value="" disabled selected>Select inspection location</option>
-                    <option value="10 Riverside Dr, Long Prairie, MN 56347">10 Riverside Dr, Long Prairie, MN 56347</option>
-                    <option value="2099 Roth St, Madison, WI 53704">2099 Roth St, Madison, WI 53704</option>
-                    <option value="W1344 Industrial Dr, Ixonia, WI 53036">W1344 Industrial Dr, Ixonia, WI 53036</option>
-                    <option value="2850 MN-60, Windom, MN 56101">2850 MN-60, Windom, MN 56101</option>
+                    <option value="10 Riverside Dr, Long Prairie, MN 56347">American Foods Group, LLC - Long Prairie Packing Co</option>
+                    <option value="2099 Roth St, Madison, WI 53704">Oscar Mayers Packing</option>
+                    <option value="W1344 Industrial Dr, Ixonia, WI 53036">Create-A-Pack Foods Inc</option>
+                    <option value="2850 MN-60, Windom, MN 56101">HyLife Foods</option>
                 </select>
             </div>
             <div id="map" class="w-full h-96 rounded-lg shadow-lg mb-4"></div>
@@ -94,12 +100,13 @@
 
     <!-- Firebase Scripts -->
     <script type="module">
-        // Import the functions you need from the SDKs you need
+        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
+        // Initialize Firebase
+        const app = initializeApp({
             apiKey: "AIzaSyCwI08TncslS8hcgOy3TWQxgycHTSlfiac",
             authDomain: "gemini-med-lit-review.firebaseapp.com",
             projectId: "gemini-med-lit-review",
@@ -107,15 +114,15 @@
             messagingSenderId: "934163632848",
             appId: "1:934163632848:web:621139404479e7562e44d5",
             measurementId: "G-Y4Y3EGC8KZ"
-        };
+        });
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
+        // Initialize Firebase services
         const analytics = getAnalytics(app);
+        const functions = getFunctions(app, 'us-central1');
+        
+        // Make functions available globally
+        window.getMapData = httpsCallable(functions, 'analyzeSitePrecheck');
     </script>
-    
-    <!-- Google Maps Script -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD8VN9tbzMZx_lLUhO8DNq05uTBEuyLNGU"></script>
     
     <!-- Application Scripts -->
     <script src="/app.js" type="module"></script>

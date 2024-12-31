@@ -3,3 +3,9 @@ backend/create-rag-datastore/processed_documents
 backend/image-inspection/test1/
 frontend/test/template_app.txt
 node_modules
+
+# Environment Variables
+.env
+.env.local
+.env.development
+.env.production
