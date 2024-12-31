@@ -53,59 +53,166 @@ if ('webkitSpeechRecognition' in window) {
     };
 }
 
-// Initialize Google Maps
-let map = null;
-async function initMap() {
-    if (!map) {
-        // Default to first location
-        const defaultAddress = "10 Riverside Dr, Long Prairie, MN 56347";
-        const coordinates = document.getElementById('coordinates');
-        coordinates.value = defaultAddress;
+// Get location details from coordinates dropdown
+function getLocationDetails(address) {
+    const coordinates = document.getElementById('coordinates');
+    const locationData = JSON.parse(coordinates.dataset.coordinates);
+    return locationData.find(location => location.address === address);
+}
 
-        try {
-            // Create map instance
-            map = new google.maps.Map(document.getElementById('map'), {
-                center: { lat: 44.7862, lng: -93.2650 },
-                zoom: 8,
-                mapTypeId: 'satellite',
-                tilt: 0
-            });
-
-            // Initialize geocoder
-            const geocoder = new google.maps.Geocoder();
-            
-            // Geocode default address
-            const geocodeResult = await new Promise((resolve, reject) => {
-                geocoder.geocode({ address: defaultAddress }, (results, status) => {
-                    if (status === 'OK') {
-                        resolve(results[0]);
-                    } else {
-                        reject(new Error(`Geocoding failed: ${status}`));
-                    }
-                });
-            });
-
-            const location = geocodeResult.geometry.location;
-            
-            // Update map with satellite view
-            map.setCenter(location);
-            map.setZoom(19);
-            map.setMapTypeId('satellite');
-
-            // Add marker
-            new google.maps.Marker({
-                map,
-                position: location,
-                title: defaultAddress
-            });
-
-            // Trigger analysis for default location
-            const event = new Event('change');
-            coordinates.dispatchEvent(event);
-
-        } catch (error) {
-            console.error('Error initializing map:', error);
+// Load satellite image for a location
+async function loadSatelliteImage(address) {
+    console.log('Fetching satellite image...');
+    try {
+        const imageResult = await window.getMapData({ address });
+        
+        if (!imageResult.data) {
+            console.error('No data received from getMapData');
+            throw new Error('Failed to get satellite image data');
         }
+        
+        const { mapUrl, mapImage } = imageResult.data;
+        if (!mapImage) {
+            console.error('No image data received from getMapData');
+            throw new Error('Failed to get satellite image');
+        }
+        
+        console.log('Successfully received satellite image');
+        
+        // Get location details
+        const locationDetails = getLocationDetails(address);
+        
+        // Display satellite image
+        mapContainer.innerHTML = `
+            <img src="${mapImage}" alt="Satellite view" class="w-full h-full object-cover rounded-lg">
+        `;
+        
+        return { mapImage, locationDetails };
+    } catch (err) {
+        console.error('Error loading satellite image:', err);
+        mapContainer.innerHTML = '<div class="p-4 text-red-600">Error loading satellite image</div>';
+        throw err;
+    }
+}
+
+// Analyze site image
+async function analyzeSite(mapImage) {
+    console.log('Starting vehicle detection analysis...');
+    try {
+        const analysisResult = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/site-check-py', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: mapImage })
+        });
+
+        if (!analysisResult.ok) {
+            const errorText = await analysisResult.text();
+            console.error('Analysis failed:', errorText);
+            throw new Error(`Failed to analyze image: ${errorText}`);
+        }
+
+        console.log('Received analysis response');
+        const analysisData = await analysisResult.json();
+        console.log('Analysis data:', {
+            hasVehicleAnalysis: !!analysisData.vehicle_analysis,
+            hasAnnotatedImage: !!analysisData.annotated_image,
+            vehicleCount: analysisData.vehicle_analysis?.total_count
+        });
+
+        const { vehicle_analysis, annotated_image } = analysisData;
+        if (!vehicle_analysis || !annotated_image) {
+            console.error('Invalid analysis response:', analysisData);
+            throw new Error('Invalid analysis response');
+        }
+
+        return { vehicle_analysis, annotated_image };
+    } catch (err) {
+        console.error('Error during analysis:', err);
+        throw err;
+    }
+}
+
+// Initialize map view
+let mapContainer = null;
+async function initMap() {
+    mapContainer = document.getElementById('map');
+    const coordinates = document.getElementById('coordinates');
+    const defaultAddress = "10 Riverside Dr, Long Prairie, MN 56347";
+    
+    // Set the default value
+    coordinates.value = defaultAddress;
+    
+    // Start analysis for default address
+    await analyzeLocation(defaultAddress);
+}
+
+// Analyze a location
+async function analyzeLocation(address) {
+    const resultElement = document.getElementById('precheckResult');
+    resultElement.textContent = 'Loading satellite image...';
+
+    try {
+        // First load the satellite image
+        const { mapImage, locationDetails } = await loadSatelliteImage(address);
+        
+        // Show initial location info while analysis runs
+        resultElement.innerHTML = `
+            <div class="mb-2">
+                <span class="font-semibold">Location:</span>
+                <div class="text-sm font-bold">${locationDetails.name}</div>
+                <div class="text-sm">${locationDetails.address}</div>
+                <div class="text-sm text-gray-600">Coordinates: ${locationDetails.lat}, ${locationDetails.lon}</div>
+            </div>
+            <div class="animate-pulse mt-4">
+                <div class="text-sm">Analyzing site activity...</div>
+            </div>
+        `;
+        
+        // Then analyze the image
+        const { vehicle_analysis, annotated_image } = await analyzeSite(mapImage);
+        
+        // Generate activity alert
+        const activityAlert = `Based on this month's aerial images, there ${vehicle_analysis.total_count > 0 ? 'have' : 'have not'} been signs of activity and usage at this inspection site. ${vehicle_analysis.total_count > 0 ? `The presence of ${vehicle_analysis.total_count} vehicle${vehicle_analysis.total_count > 1 ? 's' : ''} suggests ongoing operations.` : 'No vehicles were detected in the current image.'}`;
+        
+        // Format the vehicle observations as a list
+        const vehicleObservations = vehicle_analysis.observations.map(obs => `• ${obs}`).join('\n');
+        
+        // Display analysis results
+        resultElement.innerHTML = `
+            <div class="mb-2">
+                <span class="font-semibold">Location:</span>
+                <div class="text-sm font-bold">${locationDetails.name}</div>
+                <div class="text-sm">${locationDetails.address}</div>
+                <div class="text-sm text-gray-600">Coordinates: ${locationDetails.lat}, ${locationDetails.lon}</div>
+            </div>
+            <div class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700">
+                ${activityAlert}
+            </div>
+            <div class="mb-2">
+                <span class="font-semibold">Vehicle Analysis:</span>
+                <div class="pl-4 text-sm">
+                    <div class="mb-1">Total Vehicles: ${vehicle_analysis.total_count}</div>
+                    <div class="mb-1">Vehicle Types:</div>
+                    ${Object.entries(vehicle_analysis.vehicles.reduce((acc, v) => {
+                        acc[v.type] = (acc[v.type] || 0) + 1;
+                        return acc;
+                    }, {})).map(([type, count]) => `• ${count} ${type}${count > 1 ? 's' : ''}`).join('\n')}
+                </div>
+            </div>
+            <div class="mb-2">
+                <span class="font-semibold">Observations:</span>
+                <div class="pl-4 text-sm">${vehicleObservations}</div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error analyzing location:', error);
+        resultElement.innerHTML = `
+            <div class="p-4 text-red-600">
+                Error: ${error.message}
+            </div>
+        `;
     }
 }
 
@@ -283,23 +390,14 @@ async function processInspection() {
         processButton.disabled = true;
         processButton.textContent = 'Processing...';
 
-        const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                image: capturedImage,
-                background: background
-            })
+        // Use Firebase Function with App Check
+        const processInspectionFn = httpsCallable(functions, 'processInspection');
+        const result = await processInspectionFn({
+            image: capturedImage,
+            background: background
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        displayCitations(data.citations);
+        displayCitations(result.data.citations);
 
     } catch (err) {
         console.error('Error processing inspection:', err);
@@ -340,84 +438,5 @@ switchView('precheck');
 document.getElementById('coordinates').addEventListener('change', async (e) => {
     const address = e.target.value;
     if (!address) return;
-
-    const resultElement = document.getElementById('precheckResult');
-    resultElement.textContent = 'Loading location...';
-
-    try {
-        // Initialize geocoder if needed
-        const geocoder = new google.maps.Geocoder();
-        
-        // Geocode the address
-        const geocodeResult = await new Promise((resolve, reject) => {
-            geocoder.geocode({ address }, (results, status) => {
-                if (status === 'OK') {
-                    resolve(results[0]);
-                } else {
-                    reject(new Error(`Geocoding failed: ${status}`));
-                }
-            });
-        });
-
-        const location = geocodeResult.geometry.location;
-        const coords = `${location.lat()},${location.lng()}`;
-        
-        // Update map with satellite view
-        map.setCenter(location);
-        map.setZoom(19); // Closer zoom for better satellite detail
-        map.setMapTypeId('satellite');
-
-        // Add a marker
-        new google.maps.Marker({
-            map,
-            position: location,
-            title: address
-        });
-
-        resultElement.textContent = 'Analyzing location...';
-
-        const response = await fetch('https://analyzesiteprecheck-jlrwvtesnq-uc.a.run.app', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ coordinates: coords })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const analysis = await response.json();
-        
-        // Format the observations as a list
-        const observationsList = analysis.observations.map(obs => `• ${obs}`).join('\n');
-        
-        resultElement.innerHTML = `
-            <div class="mb-2">
-                <span class="font-semibold">Status:</span> 
-                ${analysis.isActive ? 
-                    '<span class="text-green-600">Active</span>' : 
-                    '<span class="text-red-600">Inactive</span>'}
-                (${Math.round(analysis.confidence * 100)}% confidence)
-            </div>
-            <div class="mb-2">
-                <span class="font-semibold">Location:</span>
-                <div class="text-sm">${geocodeResult.formatted_address}</div>
-            </div>
-            <div class="mb-2">
-                <span class="font-semibold">Observations:</span>
-                <div class="pl-4 text-sm">${observationsList}</div>
-            </div>
-            <div class="mt-2">
-                <span class="font-semibold">Recommendation:</span>
-                <div class="text-sm">${analysis.recommendation}</div>
-            </div>
-        `;
-
-    } catch (err) {
-        console.error('Error analyzing site:', err);
-        alert('Error analyzing the location. Please try again.');
-        resultElement.textContent = 'Error analyzing location.';
-    }
+    await analyzeLocation(address);
 });
