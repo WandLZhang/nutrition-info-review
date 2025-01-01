@@ -431,12 +431,30 @@ captureButton.addEventListener('click', captureFrame);
 retakeButton.addEventListener('click', retakePhoto);
 processButton.addEventListener('click', processInspection);
 
-// Initialize first view
-switchView('precheck');
+// Wait for Firebase to initialize before starting the app
+window.addEventListener('firebaseReady', () => {
+    // Initialize first view
+    switchView('precheck');
 
-// Handle location selection for precheck
-document.getElementById('coordinates').addEventListener('change', async (e) => {
-    const address = e.target.value;
-    if (!address) return;
-    await analyzeLocation(address);
+    // Handle location selection for precheck
+    document.getElementById('coordinates').addEventListener('change', async (e) => {
+        const address = e.target.value;
+        if (!address) return;
+        await analyzeLocation(address);
+    });
+});
+
+// Add error handling for Firebase initialization
+window.addEventListener('error', (event) => {
+    if (event.error?.message?.includes('Firebase')) {
+        console.error('Firebase initialization error:', event.error);
+        const resultElement = document.getElementById('precheckResult');
+        if (resultElement) {
+            resultElement.innerHTML = `
+                <div class="p-4 text-red-600">
+                    Error initializing application. Please try refreshing the page.
+                </div>
+            `;
+        }
+    }
 });

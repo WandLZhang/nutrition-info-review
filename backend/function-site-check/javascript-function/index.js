@@ -4,7 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
 
-// Define Maps API key parameter
+// Define API key parameters
 const mapsApiKey = defineString('MAPS_API_KEY');
 
 // Initialize Express app
@@ -137,9 +137,53 @@ function generateActivityAlert(vehicleCount) {
   return `Based on this month's aerial images, there ${hasActivity ? 'have' : 'have not'} been signs of activity and usage at this inspection site. ${hasActivity ? `The presence of ${vehicleCount} vehicle${vehicleCount > 1 ? 's' : ''} suggests ongoing operations.` : 'No vehicles were detected in the current image.'}`;
 }
 
-// Export the Cloud Functions with Maps API key parameter
+// Initialize Express app for Firebase config
+const firebaseConfigApp = express();
+firebaseConfigApp.use(cors(corsOptions));
+firebaseConfigApp.use(express.json());
+
+// Endpoint to get Firebase config
+firebaseConfigApp.get('/', async (req, res) => {
+  try {
+    console.log('[getFirebaseConfig] Attempting to access secret');
+    
+    const config = {
+      apiKey: process.env.APP_FIREBASE_KEY,
+      authDomain: "gemini-med-lit-review.firebaseapp.com",
+      projectId: "gemini-med-lit-review",
+      storageBucket: "gemini-med-lit-review.firebasestorage.app",
+      messagingSenderId: "934163632848",
+      appId: "1:934163632848:web:621139404479e7562e44d5",
+      measurementId: "G-Y4Y3EGC8KZ"
+    };
+
+    console.log('[getFirebaseConfig] Config built with apiKey:', config.apiKey ? 'Present' : 'Missing');
+
+    // Validate required fields
+    const requiredFields = ['apiKey', 'authDomain', 'projectId', 'storageBucket'];
+    const missingFields = requiredFields.filter(field => !config[field]);
+    
+    if (missingFields.length > 0) {
+      throw new Error(`Missing required Firebase config fields: ${missingFields.join(', ')}`);
+    }
+
+    // Return validated config
+    res.json({ data: config });
+  } catch (error) {
+    console.error('[getFirebaseConfig] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Export the Cloud Functions
 export const analyzeSitePrecheck = onRequest({
   memory: '2GB',
   timeoutSeconds: 540,
   params: { mapsApiKey }
 }, analyzeSitePrecheckApp);
+
+export const getFirebaseConfig = onRequest({
+  memory: '256MB',
+  timeoutSeconds: 60,
+  secrets: ['APP_FIREBASE_KEY']
+}, firebaseConfigApp);

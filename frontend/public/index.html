@@ -105,23 +105,34 @@
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
-        // Initialize Firebase
-        const app = initializeApp({
-            apiKey: "AIzaSyCwI08TncslS8hcgOy3TWQxgycHTSlfiac",
-            authDomain: "gemini-med-lit-review.firebaseapp.com",
-            projectId: "gemini-med-lit-review",
-            storageBucket: "gemini-med-lit-review.firebasestorage.app",
-            messagingSenderId: "934163632848",
-            appId: "1:934163632848:web:621139404479e7562e44d5",
-            measurementId: "G-Y4Y3EGC8KZ"
-        });
+        // Initialize Firebase with config from backend
+        window.initializeFirebase = async function() {
+            try {
+                const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/getFirebaseConfig');
+                if (!response.ok) throw new Error('Failed to fetch Firebase config');
+                const { data: config } = await response.json();
+                
+                // Initialize Firebase with fetched config
+                const app = initializeApp(config);
+                const analytics = getAnalytics(app);
+                const functions = getFunctions(app, 'us-central1');
+                
+                // Make functions available globally
+                window.getMapData = httpsCallable(functions, 'analyzeSitePrecheck');
+                
+                // Signal that Firebase is ready
+                window.firebaseInitialized = true;
+                
+                // Dispatch event for app.js
+                window.dispatchEvent(new Event('firebaseReady'));
+            } catch (error) {
+                console.error('Failed to initialize Firebase:', error);
+                throw error;
+            }
+        };
 
-        // Initialize Firebase services
-        const analytics = getAnalytics(app);
-        const functions = getFunctions(app, 'us-central1');
-        
-        // Make functions available globally
-        window.getMapData = httpsCallable(functions, 'analyzeSitePrecheck');
+        // Initialize Firebase when page loads
+        window.initializeFirebase().catch(console.error);
     </script>
     
     <!-- Application Scripts -->
