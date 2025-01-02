@@ -118,13 +118,25 @@ async function analyzeSite(mapImage) {
         console.log('Analysis data:', {
             hasVehicleAnalysis: !!analysisData.vehicle_analysis,
             hasAnnotatedImage: !!analysisData.annotated_image,
-            vehicleCount: analysisData.vehicle_analysis?.total_count
+            totalVehicles: analysisData.vehicle_analysis?.total_vehicles,
+            clusterCount: analysisData.vehicle_analysis?.clusters?.length
         });
 
         const { vehicle_analysis, annotated_image } = analysisData;
         if (!vehicle_analysis || !annotated_image) {
             console.error('Invalid analysis response:', analysisData);
             throw new Error('Invalid analysis response');
+        }
+
+        // Validate cluster data
+        if (!vehicle_analysis.clusters || !Array.isArray(vehicle_analysis.clusters)) {
+            console.error('Missing or invalid clusters array:', vehicle_analysis);
+            throw new Error('Invalid cluster data in analysis response');
+        }
+
+        if (!vehicle_analysis.activity_level || !['low', 'high'].includes(vehicle_analysis.activity_level)) {
+            console.error('Missing or invalid activity_level:', vehicle_analysis);
+            throw new Error('Invalid activity level in analysis response');
         }
 
         return { vehicle_analysis, annotated_image };
@@ -170,42 +182,122 @@ async function analyzeLocation(address) {
             </div>
         `;
         
-        // Then analyze the image
-        const { vehicle_analysis, annotated_image } = await analyzeSite(mapImage);
-        
-        // Generate activity alert
-        const activityAlert = `Based on this month's aerial images, there ${vehicle_analysis.total_count > 0 ? 'have' : 'have not'} been signs of activity and usage at this inspection site. ${vehicle_analysis.total_count > 0 ? `The presence of ${vehicle_analysis.total_count} vehicle${vehicle_analysis.total_count > 1 ? 's' : ''} suggests ongoing operations.` : 'No vehicles were detected in the current image.'}`;
-        
-        // Format the vehicle observations as a list
-        const vehicleObservations = vehicle_analysis.observations.map(obs => `• ${obs}`).join('\n');
-        
-        // Display analysis results
+        // Initialize streaming output
         resultElement.innerHTML = `
             <div class="mb-2">
                 <span class="font-semibold">Location:</span>
                 <div class="text-sm font-bold">${locationDetails.name}</div>
                 <div class="text-sm">${locationDetails.address}</div>
-                <div class="text-sm text-gray-600">Coordinates: ${locationDetails.lat}, ${locationDetails.lon}</div>
             </div>
-            <div class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700">
-                ${activityAlert}
-            </div>
-            <div class="mb-2">
-                <span class="font-semibold">Vehicle Analysis:</span>
-                <div class="pl-4 text-sm">
-                    <div class="mb-1">Total Vehicles: ${vehicle_analysis.total_count}</div>
-                    <div class="mb-1">Vehicle Types:</div>
-                    ${Object.entries(vehicle_analysis.vehicles.reduce((acc, v) => {
-                        acc[v.type] = (acc[v.type] || 0) + 1;
-                        return acc;
-                    }, {})).map(([type, count]) => `• ${count} ${type}${count > 1 ? 's' : ''}`).join('\n')}
-                </div>
-            </div>
-            <div class="mb-2">
-                <span class="font-semibold">Observations:</span>
-                <div class="pl-4 text-sm">${vehicleObservations}</div>
+            <div id="streamingOutput" class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700">
+                Starting analysis...
             </div>
         `;
+
+        // Start analysis in parallel with streaming
+        const analysisPromise = analyzeSite(mapImage).catch(error => {
+            console.error('Analysis failed:', error);
+            throw error;
+        });
+
+        // Start streaming status updates
+        const streamingOutput = document.getElementById('streamingOutput');
+        const analysisStream = new EventSource('https://us-central1-gemini-med-lit-review.cloudfunctions.net/site-check-py/stream');
+        
+        // Wait for streaming to complete
+        await new Promise((resolve, reject) => {
+            analysisStream.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'status') {
+                        streamingOutput.innerHTML = `<div class="streaming-loading">
+                            <span>${data.content}</span>
+                            <div class="loading-dots">
+                                <span>.</span><span>.</span><span>.</span>
+                            </div>
+                        </div>`;
+                        
+                        if (data.content.includes('Finalizing analysis')) {
+                            analysisStream.close();
+                            resolve();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error parsing stream data:', error);
+                    analysisStream.close();
+                    reject(error);
+                }
+            };
+
+            analysisStream.onerror = (error) => {
+                console.error('Stream error:', error);
+                analysisStream.close();
+                reject(new Error('Stream connection failed'));
+            };
+        });
+
+        // Wait for analysis to complete
+        const analysisResult = await analysisPromise;
+        
+        // Update map with annotated image
+        mapContainer.innerHTML = `
+            <img src="${analysisResult.annotated_image}" alt="Analyzed satellite view" class="w-full h-full object-cover rounded-lg">
+        `;
+
+        // Update streaming output with final results
+        const { activity_level, clusters, observations } = analysisResult.vehicle_analysis;
+        let activityDescription;
+        
+        if (activity_level === "low") {
+            activityDescription = "Limited vehicle activity detected (6 or fewer vehicles), suggesting minimal or intermittent site usage.";
+        } else {
+            activityDescription = "Significant vehicle activity detected (more than 6 vehicles), indicating active site operations.";
+        }
+
+        // Add a slight delay to ensure streaming messages are visible
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const finalResults = `
+            <div class="mt-4">
+                <div class="font-bold mb-2">Activity Level: ${activity_level === "low" ? "Low" : "High"}</div>
+                <div class="mb-4">${activityDescription}</div>
+                <div class="mt-4 text-gray-600">
+                ${observations.map(obs => `
+                    <div class="mt-2">• ${obs}</div>
+                `).join('')}
+                </div>
+            </div>
+        `;
+        
+        // Update with final results
+        streamingOutput.innerHTML = `
+            <div class="text-sm text-blue-600 mb-2">Analysis complete</div>
+            ${finalResults}
+        `;
+
+        // Automatically play audio
+        (async () => {
+            try {
+                const speechText = `Activity Level: ${activity_level === "low" ? "Low" : "High"}. ${activityDescription} ${observations.join('. ')}`;
+                const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/fda-generate-audio', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: speechText })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate audio');
+                }
+
+                const { audio } = await response.json();
+                const audioElement = new Audio(`data:audio/wav;base64,${audio}`);
+                audioElement.play();
+            } catch (error) {
+                console.error('Error playing audio:', error);
+            }
+        })();
     } catch (error) {
         console.error('Error analyzing location:', error);
         resultElement.innerHTML = `
@@ -248,6 +340,14 @@ function switchView(view) {
         initMap();
     } else if (view === 'inspection') {
         inspectionView.classList.remove('hidden');
+        // Initialize inspection view buttons
+        captureButton.style.display = 'flex';
+        retakeButton.style.display = 'none';
+        // Clear any existing preview or results
+        const preview = document.getElementById('preview');
+        if (preview) preview.remove();
+        citationResults.innerHTML = '';
+        inspectionInput.value = '';
     }
     
     currentView = view;
@@ -340,6 +440,7 @@ function showPreview(imageData) {
     const preview = document.createElement('img');
     preview.src = imageData;
     preview.className = 'absolute inset-0 w-full h-full object-contain bg-black';
+    preview.style.zIndex = '10';
     preview.id = 'preview';
     
     // Remove any existing preview
@@ -348,12 +449,17 @@ function showPreview(imageData) {
         existingPreview.remove();
     }
     
-    // Add preview to camera container
-    camera.parentElement.appendChild(preview);
+    // Hide the camera
+    camera.style.display = 'none';
     
-    // Show retake button, hide capture button
-    captureButton.classList.add('hidden');
-    retakeButton.classList.remove('hidden');
+    // Add preview to the camera container
+    const cameraContainer = camera.parentElement;
+    cameraContainer.appendChild(preview);
+    
+    // Update button visibility
+    captureButton.style.display = 'none';
+    cameraToggle.style.display = 'none';
+    retakeButton.style.display = 'flex';
 }
 
 // Retake photo
@@ -364,13 +470,23 @@ function retakePhoto() {
         preview.remove();
     }
     
-    // Show capture button, hide retake button
-    captureButton.classList.remove('hidden');
-    retakeButton.classList.add('hidden');
+    // Update button visibility
+    captureButton.style.display = 'flex';
+    cameraToggle.style.display = 'flex';
+    retakeButton.style.display = 'none';
     
     // Clear captured image and file input
     capturedImage = null;
     fileInput.value = '';
+    
+    // Clear citation results
+    citationResults.innerHTML = '';
+    
+    // Clear background input
+    inspectionInput.value = '';
+    
+    // Ensure camera is visible
+    camera.style.display = 'block';
 }
 
 // Process Inspection
@@ -390,14 +506,57 @@ async function processInspection() {
         processButton.disabled = true;
         processButton.textContent = 'Processing...';
 
-        // Use Firebase Function with App Check
-        const processInspectionFn = httpsCallable(functions, 'processInspection');
-        const result = await processInspectionFn({
-            image: capturedImage,
-            background: background
+        // Clear previous results and show status container
+        citationResults.innerHTML = `
+            <div id="inspectionStatus" class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700">
+                <div class="streaming-loading">
+                    <span>Initializing image analysis...</span>
+                    <div class="loading-dots">
+                        <span>.</span><span>.</span><span>.</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Call cloud function directly
+        const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                image: capturedImage,
+                background: background
+            })
         });
 
-        displayCitations(result.data.citations);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        // Process status updates if they exist
+        if (result.status_updates) {
+            const statusElement = document.getElementById('inspectionStatus');
+            for (const status of result.status_updates) {
+                statusElement.innerHTML = `
+                    <div class="streaming-loading">
+                        <span>${status.message}</span>
+                        <div class="loading-dots">
+                            <span>.</span><span>.</span><span>.</span>
+                        </div>
+                    </div>
+                `;
+                await new Promise(resolve => setTimeout(resolve, status.duration * 1000));
+            }
+        }
+
+        displayCitations(result.citations, result.summary);
+        
+        // Keep retake button visible after processing
+        retakeButton.style.display = 'flex';
+        captureButton.style.display = 'none';
 
     } catch (err) {
         console.error('Error processing inspection:', err);
@@ -409,16 +568,57 @@ async function processInspection() {
 }
 
 // Display Citations
-function displayCitations(citations) {
+function displayCitations(citations, summary) {
     citationResults.innerHTML = '';
+
+    // Create and add summary container
+    const summaryContainer = document.createElement('div');
+    summaryContainer.className = 'summary-container';
+    summaryContainer.innerHTML = `
+        <div id="streamingOutput" class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700">
+            ${summary || 'No summary available for these citations.'}
+        </div>
+    `;
+    citationResults.appendChild(summaryContainer);
+
+    // Automatically play summary audio
+    (async () => {
+        try {
+            const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/fda-generate-audio', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text: summary })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate audio');
+            }
+
+            const { audio } = await response.json();
+            const audioElement = new Audio(`data:audio/wav;base64,${audio}`);
+            audioElement.play();
+        } catch (error) {
+            console.error('Error playing audio:', error);
+        }
+    })();
+
+    // Add individual citation cards
     citations.forEach(citation => {
         const card = document.createElement('div');
         card.className = 'citation-card';
         card.innerHTML = `
             <img src="${citation.image}" alt="Citation evidence">
-            <h3>Section ${citation.section}</h3>
-            <p class="text-gray-600 mb-2">${citation.text}</p>
-            <p>${citation.reason}</p>
+            <h3><a href="${citation.url}" target="_blank" class="text-blue-600 hover:text-blue-800">Section ${citation.section}</a></h3>
+            <div class="mt-3">
+                <h4 class="font-semibold text-gray-700">Regulation:</h4>
+                <p class="text-gray-600 mb-2">${citation.text}</p>
+            </div>
+            <div class="mt-3">
+                <h4 class="font-semibold text-gray-700">Reason:</h4>
+                <p>${citation.reason}</p>
+            </div>
         `;
         citationResults.appendChild(card);
     });

@@ -283,8 +283,13 @@ def verify_and_complete_response(initial_response, img):
 
         For the 'url' field, generate a valid URL to the specific section of the Title 21 eCFR regulation. 
         The URL should follow this format: 
-        https://www.ecfr.gov/current/title-21/chapter-[CHAPTER]/subchapter-[SUB CHAPTER]/part-[PART]#[SECTION]
+        https://www.ecfr.gov/current/title-21/chapter-[CHAPTER]/subchapter-[SUB CHAPTER]/part-[PART]#p-[PART].[SECTION]
 
+        For example, if citing section 110.80(b)(1), the URL should be:
+        https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-110#p-110.80(b)(1)
+
+        Note: The '#p-' prefix is required before the section number in the URL.
+        
         Ensure that the generated URL is correct and points to the specific section cited."""
 
         generation_config = {
@@ -335,6 +340,9 @@ def verify_and_complete_response(initial_response, img):
                     # Convert image to PIL Image for bounding box
                     img_bytes = io.BytesIO(base64.b64decode(img))
                     pil_img = Image.open(img_bytes)
+                    # Convert to RGB mode if needed
+                    if pil_img.mode in ('RGBA', 'LA', 'P'):
+                        pil_img = pil_img.convert('RGB')
                     
                     # Plot bounding box and get base64 image
                     image_base64 = plot_bounding_box(pil_img.copy(), citation, verified_citation['section'], index)
@@ -345,7 +353,58 @@ def verify_and_complete_response(initial_response, img):
         except Exception as e:
             logger.error(f"Error processing verification response: {str(e)}")
 
-    return {"citations": verified_citations}
+    # Generate summary after citations are verified
+    if verified_citations:
+        summary_prompt = f"""Generate a brief summary of the following FDA citations in 2-3 sentences. Focus on the key issues identified and their potential impact on food safety or compliance.
+
+        Citations:
+        {json.dumps(verified_citations, indent=2)}
+
+        Provide your response as a simple string without any JSON formatting or additional markup."""
+
+        generation_config = {
+            "max_output_tokens": 8192,
+            "temperature": 1,
+            "top_p": 0.95,
+        }
+
+        safety_settings = [
+            SafetySetting(
+                category=SafetySetting.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=SafetySetting.HarmBlockThreshold.OFF
+            ),
+            SafetySetting(
+                category=SafetySetting.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=SafetySetting.HarmBlockThreshold.OFF
+            ),
+            SafetySetting(
+                category=SafetySetting.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=SafetySetting.HarmBlockThreshold.OFF
+            ),
+            SafetySetting(
+                category=SafetySetting.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=SafetySetting.HarmBlockThreshold.OFF
+            ),
+        ]
+
+        summary_response = gemini_model.generate_content(
+            [summary_prompt],
+            generation_config=generation_config,
+            safety_settings=safety_settings,
+            stream=True,
+        )
+
+        summary_text = ""
+        for response in summary_response:
+            if response.candidates and response.candidates[0].content.parts:
+                summary_text += response.text
+
+        return {
+            "citations": verified_citations,
+            "summary": summary_text.strip()
+        }
+    
+    return {"citations": verified_citations, "summary": ""}
 
 @functions_framework.http
 def process_inspection(request):
@@ -372,14 +431,26 @@ def process_inspection(request):
         if not image_data or not inspection_type:
             return jsonify({'error': 'Missing required fields'}), 400, headers
 
-        # Generate initial response
+        # Initialize status list
+        status_updates = []
+        
+        # Generate initial response with status updates
+        status_updates.append({"message": "Initializing image analysis...", "duration": 0.5})
+        status_updates.append({"message": "Processing visual elements...", "duration": 1.5})
+        status_updates.append({"message": "Identifying potential violations...", "duration": 2})
         initial_response = generate_initial_response(inspection_type, image_data)
         if 'error' in initial_response:
             return (jsonify(initial_response), 500, headers)
 
-        # Verify and complete response
+        # Verify and complete response with status updates
+        status_updates.append({"message": "Cross-referencing FDA regulations...", "duration": 2})
+        status_updates.append({"message": "Validating citations...", "duration": 1.5})
+        status_updates.append({"message": "Generating inspection report...", "duration": 1})
+        status_updates.append({"message": "Finalizing analysis...", "duration": 1.5})
         verified_response = verify_and_complete_response(initial_response, image_data)
         
+        # Add status updates to response
+        verified_response["status_updates"] = status_updates
         return (jsonify(verified_response), 200, headers)
 
     except Exception as e:

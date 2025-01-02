@@ -56,22 +56,38 @@
 
         <!-- Inspection Tool View -->
         <div id="inspectionView" class="hidden">
-            <div class="relative">
-                <video id="camera" class="w-full h-64 bg-black rounded-lg mb-4" autoplay playsinline></video>
-                <div class="absolute bottom-4 left-4 flex gap-2">
-                    <button id="cameraToggle" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow">
-                        <span class="material-icons">videocam</span>
-                    </button>
-                    <button id="captureButton" class="bg-red-500 text-white px-4 py-2 rounded-lg shadow">
-                        <span class="material-icons">photo_camera</span>
-                    </button>
-                    <button id="retakeButton" class="hidden bg-yellow-500 text-white px-4 py-2 rounded-lg shadow">
-                        <span class="material-icons">refresh</span>
-                    </button>
-                    <label class="bg-green-500 text-white px-4 py-2 rounded-lg shadow cursor-pointer">
-                        <span class="material-icons">upload</span>
-                        <input type="file" id="fileInput" accept="image/*" class="hidden">
-                    </label>
+            <div class="relative" style="z-index: 0;">
+                <!-- Camera and preview container -->
+                <div class="relative h-64 bg-black rounded-lg mb-4">
+                    <video id="camera" class="w-full h-full object-cover" autoplay playsinline></video>
+                </div>
+                <!-- Controls container -->
+                <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-4" style="z-index: 20;">
+                    <div class="flex justify-between">
+                        <!-- Left side buttons -->
+                        <div class="flex gap-2">
+                            <button id="cameraToggle" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow flex items-center">
+                                <span class="material-icons mr-2">videocam</span>
+                                <span>Camera</span>
+                            </button>
+                            <button id="captureButton" class="bg-red-500 text-white px-4 py-2 rounded-lg shadow flex items-center">
+                                <span class="material-icons mr-2">photo_camera</span>
+                                <span>Capture</span>
+                            </button>
+                        </div>
+                        <!-- Right side buttons -->
+                        <div class="flex gap-2">
+                            <button id="retakeButton" class="bg-yellow-500 text-white px-4 py-2 rounded-lg shadow flex items-center" style="display: none;">
+                                <span class="material-icons mr-2">refresh</span>
+                                <span>Retake</span>
+                            </button>
+                            <label class="bg-green-500 text-white px-4 py-2 rounded-lg shadow cursor-pointer flex items-center">
+                                <span class="material-icons mr-2">upload</span>
+                                <span>Upload</span>
+                                <input type="file" id="fileInput" accept="image/*" class="hidden">
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
 
