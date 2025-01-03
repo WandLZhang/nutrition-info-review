@@ -129,6 +129,57 @@ body {
     .citation-card img {
         height: 150px;
     }
+
+    /* Camera control buttons mobile styling */
+    .controls-container {
+        background: rgba(0, 0, 0, 0.3) !important;
+        padding: 12px 16px !important;
+        bottom: 0 !important;
+    }
+
+    /* Override the nested flex structure */
+    .controls-container .flex.justify-between {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: center !important;
+        gap: 12px !important;
+    }
+
+    .controls-container .flex.justify-between > div {
+        display: contents !important;
+    }
+
+    /* Hide text, show only icons */
+    .controls-container button span:not(.material-icons),
+    .controls-container label span:not(.material-icons) {
+        display: none !important;
+    }
+
+    /* Override Tailwind button styles */
+    .controls-container button,
+    .controls-container label {
+        all: unset !important;
+        width: 40px !important;
+        height: 40px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+    }
+
+    /* Maintain button colors */
+    .controls-container #cameraToggle { background-color: rgb(59, 130, 246) !important; }
+    .controls-container #captureButton { background-color: rgb(239, 68, 68) !important; }
+    .controls-container #retakeButton { background-color: rgb(245, 158, 11) !important; }
+    .controls-container label { background-color: rgb(16, 185, 129) !important; }
+
+    /* Icon styling */
+    .controls-container .material-icons {
+        font-size: 20px !important;
+        margin: 0 !important;
+        color: white !important;
+    }
 }
 
 /* Speaking Indicator */
