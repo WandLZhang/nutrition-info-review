@@ -23,6 +23,58 @@ from flask import jsonify, request
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Remove global variables for tracking processing status
+import base64
+import io
+import os
+import json
+import logging
+import functions_framework
+import time
+import flask
+import threading
+from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
+from google import genai
+from google.genai import types
+from google.api_core.client_options import ClientOptions
+from google.cloud import discoveryengine
+from google.api_core import retry
+from google.api_core.exceptions import NotFound, PermissionDenied, ResourceExhausted
+import vertexai
+from vertexai.preview.generative_models import GenerativeModel, Part, SafetySetting, Tool, grounding
+from flask import jsonify, request
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+
+import base64
+import io
+import os
+import json
+import logging
+import functions_framework
+import time
+import flask
+import threading
+from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
+from google import genai
+from google.genai import types
+from google.api_core.client_options import ClientOptions
+from google.cloud import discoveryengine
+from google.api_core import retry
+from google.api_core.exceptions import NotFound, PermissionDenied, ResourceExhausted
+import vertexai
+from vertexai.preview.generative_models import GenerativeModel, Part, SafetySetting, Tool, grounding
+from flask import jsonify, request
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 # Global variables for tracking processing status
 current_request_id = None
 current_processing_stage = "idle"
@@ -447,163 +499,75 @@ def verify_and_complete_response(initial_response, img):
     
     return {"citations": verified_citations, "summary": ""}
 
+def generate_status_stream():
+    """Generate simple status stream with delays"""
+    messages = [
+        ("Initializing image analysis...", 0.5),
+        ("Processing visual elements...", 1.5),
+        ("Identifying potential violations...", 2),
+        ("Cross-referencing FDA regulations...", 2),
+        ("Validating citations...", 1.5),
+        ("Generating inspection report...", 1),
+        ("Finalizing analysis...", 1.5)
+    ]
+    
+    for msg, delay in messages:
+        yield f'data: {{"type":"status","content":"{msg}"}}\n\n'
+        time.sleep(delay)
+
 @functions_framework.http
 def process_inspection(request):
-    global current_request_id, current_processing_stage
-    
     print("Starting process_inspection")
     # Enable CORS
-    if request.method == 'OPTIONS':
-        headers = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Access-Control-Max-Age': '3600'
-        }
-        return ('', 204, headers)
-
-    # Check if this is a streaming request
-    if request.args.get('stream') == 'true':
-        headers = {
-            'Access-Control-Allow-Origin': '*',
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive'
-        }
-        
-        request_id = request.args.get('request_id')
-        if not request_id:
-            return flask.Response("Error: No request_id provided", status=400, headers=headers)
-        
-        def generate():
-            last_stage = None
-            start_time = datetime.now()
-            
-            while (datetime.now() - start_time).total_seconds() < 120:  # 2-minute timeout
-                with processing_lock:
-                    current_stage = current_processing_stage
-                    matched_request = (current_request_id == request_id)
-                
-                if not matched_request and current_stage != "idle":
-                    yield f"data: {json.dumps({'type': 'status', 'content': 'Request not being processed'})}\n\n"
-                    break
-                    
-                if current_stage != last_stage:
-                    if current_stage == "idle" and last_stage is not None:
-                        yield f"data: {json.dumps({'type': 'status', 'content': 'Analysis complete'})}\n\n"
-                        break
-                    elif current_stage != "idle":
-                        yield f"data: {json.dumps({'type': 'status', 'content': current_stage})}\n\n"
-                        last_stage = current_stage
-                
-                time.sleep(0.5)
-            
-            if (datetime.now() - start_time).total_seconds() >= 120:
-                yield f"data: {json.dumps({'type': 'status', 'content': 'Stream timeout'})}\n\n"
-        
-        return flask.Response(generate(), headers=headers)
-
-    # If not a streaming request, process the inspection
     headers = {
         'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Max-Age': '3600'
     }
 
-    try:
-        request_json = request.get_json()
-        if not request_json:
-            return jsonify({'error': 'No JSON data received'}), 400, headers
+    if request.method == 'OPTIONS':
+        return ('', 204, headers)
 
-        image_data = request_json.get('image', '').split(',')[1]  # Remove data URL prefix
-        inspection_type = request_json.get('background', '')
-        request_id = request_json.get('request_id', str(int(time.time()*1000)))  # Generate if not provided
+    # Handle streaming endpoint
+    if request.method == 'GET' and request.path.endswith('/stream'):
+        headers['Content-Type'] = 'text/event-stream'
+        headers['Cache-Control'] = 'no-cache'
+        headers['Connection'] = 'keep-alive'
+        headers['X-Accel-Buffering'] = 'no'  # Disable proxy buffering
+        
+        return flask.Response(generate_status_stream(), 200, headers)
 
-        if not image_data or not inspection_type:
-            return jsonify({'error': 'Missing required fields'}), 400, headers
+    # Handle regular POST request for image analysis
+    if request.method == 'POST':
+        headers['Content-Type'] = 'application/json'
+        try:
+            request_json = request.get_json()
+            if not request_json:
+                return jsonify({'error': 'No JSON data received'}), 400, headers
 
-        # Create status update list for backward compatibility
-        status_updates = []
-        
-        # Set current request as being processed
-        with processing_lock:
-            current_request_id = request_id
-            current_processing_stage = "Initializing image analysis..."
-        
-        status_updates.append({"message": current_processing_stage, "duration": 0.5})
-        
-        # Update status before generating initial response
-        with processing_lock:
-            current_processing_stage = "Processing visual elements..."
-        
-        status_updates.append({"message": current_processing_stage, "duration": 1.5})
-        
-        # Update status before actual processing
-        with processing_lock:
-            current_processing_stage = "Identifying potential violations..."
-        
-        status_updates.append({"message": current_processing_stage, "duration": 2})
-        
-        print("Calling generate_initial_response")
-        # Generate initial response
-        initial_response = generate_initial_response(inspection_type, image_data)
-        print(f"Initial response generated with {len(initial_response.get('citations', []))} citations")
-        if 'error' in initial_response:
-            print(f"Error in initial response: {initial_response['error']}")
-            # Mark processing as complete
-            with processing_lock:
-                current_processing_stage = "idle"
-                current_request_id = None
-            return (jsonify(initial_response), 500, headers)
+            image_data = request_json.get('image', '').split(',')[1]  # Remove data URL prefix
+            inspection_type = request_json.get('background', '')
 
-        # Update status before verification
-        with processing_lock:
-            current_processing_stage = "Cross-referencing FDA regulations..."
-        
-        status_updates.append({"message": current_processing_stage, "duration": 2})
-        
-        # Update status during verification process
-        with processing_lock:
-            current_processing_stage = "Validating citations..."
-        
-        status_updates.append({"message": current_processing_stage, "duration": 1.5})
-        
-        # Update status before generating report
-        with processing_lock:
-            current_processing_stage = "Generating inspection report..."
-        
-        status_updates.append({"message": current_processing_stage, "duration": 1})
-        
-        # Update status before finalizing
-        with processing_lock:
-            current_processing_stage = "Finalizing analysis..."
-        
-        status_updates.append({"message": current_processing_stage, "duration": 1.5})
-        
-        print("Calling verify_and_complete_response")
-        # Verify and complete response
-        verified_response = verify_and_complete_response(initial_response, image_data)
-        print(f"Verified response generated with {len(verified_response['citations'])} citations")
-        
-        # Mark processing as complete
-        with processing_lock:
-            current_processing_stage = "idle"
-            current_request_id = None
-        
-        # Add status updates to response (keep this for backward compatibility)
-        verified_response["status_updates"] = status_updates
-        verified_response["request_id"] = request_id
-        print("Finished process_inspection")
-        return (jsonify(verified_response), 200, headers)
+            if not image_data or not inspection_type:
+                return jsonify({'error': 'Missing required fields'}), 400, headers
 
-    except Exception as e:
-        # Mark processing as complete
-        with processing_lock:
-            current_processing_stage = "idle"
-            current_request_id = None
-            
-        logger.error(f"Error processing request: {str(e)}")
-        print(f"Error in process_inspection: {str(e)}")
-        return (jsonify({"error": str(e)}), 500, headers)
+            # Generate initial response
+            initial_response = generate_initial_response(inspection_type, image_data)
+            if 'error' in initial_response:
+                return jsonify(initial_response), 500, headers
+
+            # Verify and complete response
+            verified_response = verify_and_complete_response(initial_response, image_data)
+
+            return jsonify(verified_response), 200, headers
+
+        except Exception as e:
+            logger.error(f"Error processing request: {str(e)}")
+            return jsonify({"error": str(e)}), 500, headers
+
+    # If not OPTIONS, GET /stream, or POST, return method not allowed
+    return jsonify({"error": "Method not allowed"}), 405, headers
 
 if __name__ == "__main__":
     # This is used when running locally only. When deploying to Google Cloud Functions,
@@ -611,3 +575,12 @@ if __name__ == "__main__":
     app = functions_framework.create_app(target="process_inspection")
     port = int(os.environ.get('PORT', 8080))
     app.run(host="0.0.0.0", port=port, debug=True)
+
+    # Test the streaming endpoint
+    import requests
+    stream_url = f"http://localhost:{port}/stream"
+    print(f"Testing streaming endpoint at {stream_url}")
+    response = requests.get(stream_url, stream=True)
+    for line in response.iter_lines():
+        if line:
+            print(line.decode('utf-8'))
