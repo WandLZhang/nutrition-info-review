@@ -448,59 +448,6 @@ def verify_and_complete_response(initial_response, img):
     return {"citations": verified_citations, "summary": ""}
 
 @functions_framework.http
-def stream_status(request):
-    """Stream status updates for the current processing request."""
-    # Enable CORS
-    headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-    }
-    
-    # Get or generate request_id
-    request_id = request.args.get('request_id')
-    if not request_id:
-        return flask.Response("Error: No request_id provided", status=400)
-    
-    # This is a simple streaming response generator
-    def generate():
-        last_stage = None
-        start_time = datetime.now()
-        
-        # Stream for at most 2 minutes
-        while (datetime.now() - start_time).total_seconds() < 120:  # 2-minute timeout
-            with processing_lock:
-                current_stage = current_processing_stage
-                matched_request = (current_request_id == request_id)
-            
-            # If this is for a different request or processing is complete, end
-            if not matched_request and current_stage != "idle":
-                yield f"data: {json.dumps({'type': 'status', 'content': 'Request not being processed'})}\n\n"
-                break
-                
-            # Only send update if stage changed
-            if current_stage != last_stage:
-                if current_stage == "idle" and last_stage is not None:
-                    # Processing complete
-                    yield f"data: {json.dumps({'type': 'status', 'content': 'Analysis complete'})}\n\n"
-                    break
-                elif current_stage != "idle":
-                    # Send status update for current stage
-                    yield f"data: {json.dumps({'type': 'status', 'content': current_stage})}\n\n"
-                    last_stage = current_stage
-            
-            # Sleep before checking again
-            time.sleep(0.5)
-        
-        # Final message if we timeout
-        if (datetime.now() - start_time).total_seconds() >= 120:
-            yield f"data: {json.dumps({'type': 'status', 'content': 'Stream timeout'})}\n\n"
-    
-    # Return the streaming response
-    return flask.Response(generate(), headers=headers)
-
-@functions_framework.http
 def process_inspection(request):
     global current_request_id, current_processing_stage
     
@@ -509,13 +456,58 @@ def process_inspection(request):
     if request.method == 'OPTIONS':
         headers = {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Methods': 'GET, POST',
             'Access-Control-Allow-Headers': 'Content-Type',
             'Access-Control-Max-Age': '3600'
         }
         return ('', 204, headers)
 
-    headers = {'Access-Control-Allow-Origin': '*'}
+    # Check if this is a streaming request
+    if request.args.get('stream') == 'true':
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        }
+        
+        request_id = request.args.get('request_id')
+        if not request_id:
+            return flask.Response("Error: No request_id provided", status=400, headers=headers)
+        
+        def generate():
+            last_stage = None
+            start_time = datetime.now()
+            
+            while (datetime.now() - start_time).total_seconds() < 120:  # 2-minute timeout
+                with processing_lock:
+                    current_stage = current_processing_stage
+                    matched_request = (current_request_id == request_id)
+                
+                if not matched_request and current_stage != "idle":
+                    yield f"data: {json.dumps({'type': 'status', 'content': 'Request not being processed'})}\n\n"
+                    break
+                    
+                if current_stage != last_stage:
+                    if current_stage == "idle" and last_stage is not None:
+                        yield f"data: {json.dumps({'type': 'status', 'content': 'Analysis complete'})}\n\n"
+                        break
+                    elif current_stage != "idle":
+                        yield f"data: {json.dumps({'type': 'status', 'content': current_stage})}\n\n"
+                        last_stage = current_stage
+                
+                time.sleep(0.5)
+            
+            if (datetime.now() - start_time).total_seconds() >= 120:
+                yield f"data: {json.dumps({'type': 'status', 'content': 'Stream timeout'})}\n\n"
+        
+        return flask.Response(generate(), headers=headers)
+
+    # If not a streaming request, process the inspection
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+    }
 
     try:
         request_json = request.get_json()

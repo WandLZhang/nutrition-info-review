@@ -523,11 +523,15 @@ async function processInspection() {
         
         // Connect to the streaming endpoint first with the request ID
         const statusElement = document.getElementById('inspectionStatus');
-        const streamUrl = `https://us-central1-gemini-med-lit-review.cloudfunctions.net/stream-status?request_id=${requestId}`;
-        const analysisStream = new EventSource(streamUrl);
+        const streamUrl = `https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection?stream=true&request_id=${requestId}`;
+        console.log('Connecting to stream URL:', streamUrl);
+        let analysisStream = null;
         
         // Initialize processing promise to be awaited later
         const processingPromise = new Promise((resolve, reject) => {
+            analysisStream = new EventSource(streamUrl);
+            console.log('EventSource created');
+            
             // Listen for stream messages
             analysisStream.onmessage = (event) => {
                 try {
@@ -558,8 +562,16 @@ async function processInspection() {
             // Handle stream errors
             analysisStream.onerror = (error) => {
                 console.error('Stream error:', error);
+                console.error('EventSource readyState:', analysisStream.readyState);
+                console.error('EventSource URL:', analysisStream.url);
+                statusElement.innerHTML = `
+                    <div class="error-message">
+                        Error connecting to status stream. Processing will continue.
+                    </div>
+                `;
                 analysisStream.close();
-                // Don't reject here - let the main request continue
+                // Resolve the promise to allow processing to continue
+                resolve();
             };
         });
         
@@ -576,31 +588,36 @@ async function processInspection() {
             })
         });
         
-        // The main processing request must complete, but we'll try to wait for the stream too
-        let streamingComplete = false;
+        // Set up a timeout for the entire process
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Processing timed out')), 120000) // 2 minute timeout
+        );
         
-        // Wait for the stream with a timeout
         try {
-            const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 30000)); // 30s timeout
-            await Promise.race([processingPromise, timeoutPromise]);
-            streamingComplete = true;
-        } catch (streamError) {
-            console.error('Error with status stream:', streamError);
-            // Continue with the main request even if streaming fails
-        }
-        
-        // Wait for the main processing request
-        const response = await processingRequest;
+            // Wait for both the stream and the processing request, with a timeout
+            const [streamResult, response] = await Promise.all([
+                Promise.race([processingPromise, timeoutPromise]),
+                Promise.race([processingRequest, timeoutPromise])
+            ]);
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
-        const result = await response.json();
-        
-        // If streaming didn't complete, close it now
-        if (!streamingComplete && analysisStream) {
-            analysisStream.close();
+            const result = await response.json();
+        } catch (error) {
+            console.error('Error during processing:', error);
+            statusElement.innerHTML = `
+                <div class="error-message">
+                    An error occurred during processing: ${error.message}
+                </div>
+            `;
+            throw error;
+        } finally {
+            // Ensure the stream is closed
+            if (analysisStream) {
+                analysisStream.close();
+            }
         }
         
         // Display the final results
