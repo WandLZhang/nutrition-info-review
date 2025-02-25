@@ -23,6 +23,58 @@ let capturedImage = null;
 const retakeButton = document.getElementById('retakeButton');
 const fileInput = document.getElementById('fileInput');
 
+// AudioManager class to handle all audio-related operations
+class AudioManager {
+    constructor() {
+        this.currentAudio = null;
+        this.currentAudioController = null;
+    }
+
+    stopAudio() {
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio.currentTime = 0;
+            this.currentAudio = null;
+        }
+        if (this.currentAudioController) {
+            this.currentAudioController.abort();
+            this.currentAudioController = null;
+        }
+    }
+
+    async playAudio(text) {
+        this.stopAudio();
+        this.currentAudioController = new AbortController();
+
+        try {
+            const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/fda-generate-audio', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text }),
+                signal: this.currentAudioController.signal
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate audio');
+            }
+
+            const { audio } = await response.json();
+            this.currentAudio = new Audio(`data:audio/wav;base64,${audio}`);
+            this.currentAudio.play();
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                console.log('Audio request was cancelled');
+            } else {
+                console.error('Error playing audio:', error);
+            }
+        }
+    }
+}
+
+const audioManager = new AudioManager();
+
 // Initialize Speech Recognition
 if ('webkitSpeechRecognition' in window) {
     recognition = new webkitSpeechRecognition();
@@ -160,10 +212,21 @@ async function initMap() {
     await analyzeLocation(defaultAddress);
 }
 
+let currentAnalysisController = null;
+
 // Analyze a location
 async function analyzeLocation(address) {
     const resultElement = document.getElementById('precheckResult');
     resultElement.textContent = 'Loading satellite image...';
+
+    // Cancel any ongoing analysis
+    if (currentAnalysisController) {
+        currentAnalysisController.abort();
+    }
+    currentAnalysisController = new AbortController();
+
+    // Stop any playing audio
+    audioManager.stopAudio();
 
     try {
         // First load the satellite image
@@ -234,6 +297,11 @@ async function analyzeLocation(address) {
                 analysisStream.close();
                 reject(new Error('Stream connection failed'));
             };
+
+            currentAnalysisController.signal.addEventListener('abort', () => {
+                analysisStream.close();
+                reject(new Error('Analysis aborted'));
+            });
         });
 
         // Wait for analysis to complete
@@ -276,35 +344,21 @@ async function analyzeLocation(address) {
         `;
 
         // Automatically play audio
-        (async () => {
-            try {
-                const speechText = `Activity Level: ${activity_level === "low" ? "Low" : "High"}. ${activityDescription} ${observations.join('. ')}`;
-                const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/fda-generate-audio', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ text: speechText })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to generate audio');
-                }
-
-                const { audio } = await response.json();
-                const audioElement = new Audio(`data:audio/wav;base64,${audio}`);
-                audioElement.play();
-            } catch (error) {
-                console.error('Error playing audio:', error);
-            }
-        })();
+        const speechText = `Activity Level: ${activity_level === "low" ? "Low" : "High"}. ${activityDescription} ${observations.join('. ')}`;
+        await audioManager.playAudio(speechText);
     } catch (error) {
-        console.error('Error analyzing location:', error);
-        resultElement.innerHTML = `
-            <div class="p-4 text-red-600">
-                Error: ${error.message}
-            </div>
-        `;
+        if (error.name === 'AbortError') {
+            console.log('Analysis was cancelled');
+        } else {
+            console.error('Error analyzing location:', error);
+            resultElement.innerHTML = `
+                <div class="p-4 text-red-600">
+                    Error: ${error.message}
+                </div>
+            `;
+        }
+    } finally {
+        currentAnalysisController = null;
     }
 }
 
@@ -329,6 +383,9 @@ menuItems.forEach(item => {
 
 function switchView(view) {
     if (currentView === view) return;
+    
+    // Stop any playing audio
+    audioManager.stopAudio();
     
     // Hide all views
     precheckView.classList.add('hidden');
@@ -613,27 +670,7 @@ function displayCitations(citations, summary) {
     citationResults.appendChild(summaryContainer);
 
     // Automatically play summary audio
-    (async () => {
-        try {
-            const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/fda-generate-audio', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ text: summary })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to generate audio');
-            }
-
-            const { audio } = await response.json();
-            const audioElement = new Audio(`data:audio/wav;base64,${audio}`);
-            audioElement.play();
-        } catch (error) {
-            console.error('Error playing audio:', error);
-        }
-    })();
+    audioManager.playAudio(summary);
 
     // Add individual citation cards
     citations.forEach(citation => {
@@ -671,8 +708,22 @@ window.addEventListener('firebaseReady', () => {
     document.getElementById('coordinates').addEventListener('change', async (e) => {
         const address = e.target.value;
         if (!address) return;
+        
+        audioManager.stopAudio(); // Stop any playing audio immediately
+        
+        // Cancel any ongoing analysis
+        if (currentAnalysisController) {
+            currentAnalysisController.abort();
+            currentAnalysisController = null;
+        }
+        
         await analyzeLocation(address);
     });
+});
+
+// Add event listener for page navigation
+window.addEventListener('popstate', () => {
+    audioManager.stopAudio();
 });
 
 // Add error handling for Firebase initialization
