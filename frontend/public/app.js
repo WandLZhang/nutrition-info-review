@@ -579,7 +579,7 @@ async function processInspection() {
         const statusElement = document.getElementById('inspectionStatus');
 
         // Start streaming status updates
-        const streamUrl = 'https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection/image-inspection-stream';
+        const streamUrl = 'https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection/stream';
         const analysisStream = new EventSource(streamUrl);
 
         // Wait for streaming to complete
@@ -645,11 +645,13 @@ async function processInspection() {
 
     } catch (err) {
         console.error('Error processing inspection:', err);
-        statusElement.innerHTML = `
-            <div class="error-message">
-                An error occurred while processing the inspection: ${err.message}
-            </div>
-        `;
+        if (statusElement) {
+            statusElement.innerHTML = `
+                <div class="error-message">
+                    An error occurred while processing the inspection: ${err.message}
+                </div>
+            `;
+        }
     } finally {
         processButton.disabled = false;
         processButton.textContent = 'Process';
@@ -676,17 +678,17 @@ function displayCitations(citations, summary) {
     // Add individual citation cards
     citations.forEach(citation => {
         const card = document.createElement('div');
-        card.className = 'citation-card';
+        card.className = 'citation-card mb-4 p-4 border border-gray-300 rounded-lg';
         card.innerHTML = `
-            <img src="${citation.image}" alt="Citation evidence">
-            <h3><a href="${citation.url}" target="_blank" class="text-blue-600 hover:text-blue-800">Section ${citation.section}</a></h3>
-            <div class="mt-3">
+            <img src="${citation.image}" alt="Citation evidence" class="w-full h-auto mb-3 rounded">
+            <h3 class="text-lg font-semibold mb-2"><a href="${citation.url}" target="_blank" class="text-blue-600 hover:text-blue-800">Section ${citation.section}</a></h3>
+            <div class="mb-3">
                 <h4 class="font-semibold text-gray-700">Regulation:</h4>
-                <p class="text-gray-600 mb-2">${citation.text}</p>
+                <p class="text-gray-600">${citation.text}</p>
             </div>
-            <div class="mt-3">
+            <div>
                 <h4 class="font-semibold text-gray-700">Reason:</h4>
-                <p>${citation.reason}</p>
+                <p class="text-gray-800">${citation.reason}</p>
             </div>
         `;
         citationResults.appendChild(card);
