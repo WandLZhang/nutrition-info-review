@@ -502,13 +502,13 @@ def verify_and_complete_response(initial_response, img):
 def generate_status_stream():
     """Generate simple status stream with delays"""
     messages = [
-        ("Initializing image analysis...", 0.5),
-        ("Processing visual elements...", 1.5),
-        ("Identifying potential violations...", 2),
-        ("Cross-referencing FDA regulations...", 2),
-        ("Validating citations...", 1.5),
-        ("Generating inspection report...", 1),
-        ("Finalizing analysis...", 1.5)
+        ("Initializing image analysis...", 4),
+        ("Processing visual elements...", 4),
+        ("Identifying potential violations...", 4),
+        ("Cross-referencing FDA regulations...", 16),
+        ("Validating citations...", 16),
+        ("Generating inspection report...", 6),
+        ("Finalizing analysis...", 6)
     ]
     
     for msg, delay in messages:
