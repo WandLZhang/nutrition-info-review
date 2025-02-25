@@ -1,4 +1,5 @@
 // DOM Elements
+console.log('App.js loaded - Test change', new Date().toISOString());
 const menuButton = document.getElementById('menuButton');
 const menuPanel = document.getElementById('menuPanel');
 const precheckView = document.getElementById('precheckView');

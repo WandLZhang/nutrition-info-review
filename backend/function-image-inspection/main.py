@@ -476,6 +476,21 @@ def generate_status_stream():
         except queue.Empty:
             yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
 
+def generate_status_stream():
+    """Generate status stream for inspection process"""
+    messages = [
+        "Initializing image analysis...",
+        "Processing visual elements...",
+        "Identifying potential violations...",
+        "Cross-referencing FDA regulations...",
+        "Validating citations...",
+        "Generating inspection report...",
+        "Finalizing analysis..."
+    ]
+    for msg in messages:
+        yield f"data: {json.dumps({'type': 'status', 'content': msg})}\n\n"
+        time.sleep(7)  # Simulate processing time
+
 @functions_framework.http
 def process_inspection(request):
     print("Starting process_inspection")
@@ -491,7 +506,7 @@ def process_inspection(request):
         return ('', 204, headers)
 
     # Handle streaming endpoint
-    if request.method == 'GET' and request.path.endswith('/image-inspection-stream'):
+    if request.method == 'GET' and request.path.endswith('/stream'):
         headers['Content-Type'] = 'text/event-stream'
         headers['Cache-Control'] = 'no-cache'
         headers['Connection'] = 'keep-alive'
