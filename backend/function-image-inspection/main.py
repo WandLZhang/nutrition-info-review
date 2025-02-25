@@ -185,7 +185,7 @@ def plot_bounding_box(img, citation, verified_section, index):
     return base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
 
 def generate_initial_response(inspection_type, image_data):
-    text_prompt = types.Part.from_text(f"""As an FDA inspector performing a {inspection_type} inspection, analyze the given image.
+    text_prompt = f"""As an FDA inspector performing a {inspection_type} inspection, analyze the given image.
     Based on Title 21 regulations, identify potential citation opportunities and reference 
     the specific sections of Title 21 that apply. Provide a detailed explanation for each 
     potential citation, including what is observed in the image and how it relates to the 
@@ -204,17 +204,20 @@ def generate_initial_response(inspection_type, image_data):
     Ensure that the JSON is valid and properly formatted. For each citation, provide specific 
     bounding box coordinates (normalized to 1000x1000) that focus only on the area of the image 
     relevant to that particular citation. Do not use the entire image for every citation.
-    Also, more likely the image will show a picture presented on a phone or screen. Do not remark about the act of showing the screen, it's the content's of the image being shown that matters, because this is for demonstration purposes and we won't be able to go to an inspection site often.""")
+    Also, more likely the image will show a picture presented on a phone or screen. Do not remark about the act of showing the screen, it's the content's of the image being shown that matters, because this is for demonstration purposes and we won't be able to go to an inspection site often."""
 
     contents = [
         types.Content(
             role="user",
-            parts=[text_prompt, types.Part.from_bytes(data=base64.b64decode(image_data), mime_type="image/jpeg")]
+            parts=[
+                types.Part.from_text(text=text_prompt),
+                types.Part.from_bytes(data=base64.b64decode(image_data), mime_type="image/jpeg")
+            ]
         )
     ]
 
     response = genai_client.models.generate_content(
-        model="gemini-2.0-flash-exp",
+        model="gemini-2.0-flash-001",
         contents=contents,
         config=types.GenerateContentConfig(
             temperature=1,
@@ -240,7 +243,7 @@ def generate_initial_response(inspection_type, image_data):
                 )
             ],
             tools=[types.Tool(google_search=types.GoogleSearch())],
-            system_instruction=[types.Part.from_text("""Return bounding boxes as a JSON array with labels. Never return masks or code fencing. Limit to 25 objects.
+            system_instruction=[types.Part.from_text(text="""Return bounding boxes as a JSON array with labels. Never return masks or code fencing. Limit to 25 objects.
 If an object is present multiple times, name them according to their unique characteristic (colors, size, position, unique characteristics, etc..).""")]
         )
     )
