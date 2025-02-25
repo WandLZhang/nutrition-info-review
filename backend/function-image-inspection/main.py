@@ -3,77 +3,38 @@ import io
 import os
 import json
 import logging
-import functions_framework
-import time
-import flask
+import queue
 import threading
+import time
 from datetime import datetime
+
+import flask
+import functions_framework
+from flask import jsonify, request
 from PIL import Image, ImageDraw, ImageFont
+
 from google import genai
-from google.genai import types
 from google.api_core.client_options import ClientOptions
-from google.cloud import discoveryengine
-from google.api_core import retry
 from google.api_core.exceptions import NotFound, PermissionDenied, ResourceExhausted
+from google.cloud import discoveryengine
+from google.genai import types
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel, Part, SafetySetting, Tool, grounding
-from flask import jsonify, request
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Remove global variables for tracking processing status
-import base64
-import io
-import os
-import json
-import logging
-import functions_framework
-import time
-import flask
-import threading
-from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont
-from google import genai
-from google.genai import types
-from google.api_core.client_options import ClientOptions
-from google.cloud import discoveryengine
-from google.api_core import retry
-from google.api_core.exceptions import NotFound, PermissionDenied, ResourceExhausted
-import vertexai
-from vertexai.preview.generative_models import GenerativeModel, Part, SafetySetting, Tool, grounding
-from flask import jsonify, request
+class StreamLogger(logging.Logger):
+    def __init__(self, name, level=logging.NOTSET):
+        super().__init__(name, level)
+        self.queue = queue.Queue()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+    def _log(self, level, msg, args, exc_info=None, extra=None, stack_info=False):
+        super()._log(level, msg, args, exc_info, extra, stack_info)
+        self.queue.put(json.dumps({"type": "status", "content": msg % args}))
 
-
-import base64
-import io
-import os
-import json
-import logging
-import functions_framework
-import time
-import flask
-import threading
-from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont
-from google import genai
-from google.genai import types
-from google.api_core.client_options import ClientOptions
-from google.cloud import discoveryengine
-from google.api_core import retry
-from google.api_core.exceptions import NotFound, PermissionDenied, ResourceExhausted
-import vertexai
-from vertexai.preview.generative_models import GenerativeModel, Part, SafetySetting, Tool, grounding
-from flask import jsonify, request
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+stream_logger = StreamLogger('stream_logger')
 
 # Global variables for tracking processing status
 current_request_id = None
@@ -247,6 +208,7 @@ def plot_bounding_box(img, citation, verified_section, index):
 
 def generate_initial_response(inspection_type, image_data):
     print(f"Starting generate_initial_response for {inspection_type}")
+    stream_logger.info("Initializing image analysis...")
     text_prompt = f"""As an FDA inspector performing a {inspection_type} inspection, analyze the given image.
     Based on Title 21 regulations, identify potential citation opportunities and reference 
     the specific sections of Title 21 that apply. Provide a detailed explanation for each 
@@ -279,6 +241,7 @@ def generate_initial_response(inspection_type, image_data):
     ]
 
     print(f"Sending request to Gemini model with prompt length: {len(text_prompt)}")
+    stream_logger.info("Processing visual elements...")
     response = genai_client.models.generate_content(
         model="gemini-2.0-flash-001",
         contents=contents,
@@ -311,6 +274,7 @@ If an object is present multiple times, name them according to their unique char
         )
     )
     print(f"Received response from Gemini model with length: {len(response.text)}")
+    stream_logger.info("Identifying potential violations...")
 
     try:
         response_text = response.text.strip()
@@ -332,6 +296,7 @@ def strip_image_from_citations(citations):
 
 def verify_and_complete_response(initial_response, img):
     print(f"Starting verify_and_complete_response with {len(initial_response.get('citations', []))} citations")
+    stream_logger.info("Cross-referencing FDA regulations...")
     verified_citations = []
     for index, citation in enumerate(initial_response.get('citations', [])):
         print(f"Processing citation {index + 1}")
@@ -339,6 +304,7 @@ def verify_and_complete_response(initial_response, img):
         print(f"Retrieved relevant codes with length: {len(relevant_codes)}")
         
         print(f"Generating verification prompt for citation {index + 1}")
+        stream_logger.info(f"Validating citation {index + 1}...")
         verification_prompt = f"""Given the following citation and other relevant codes retrieved from the FDA Title 21 regulations, 
         decide which is better and more relevant for the given citation "reason": the original cited section OR another section from the retrieved relevant codes. Use chain of thought. If there is a better section code from the retrieved relevant codes, replace the original cited "section" and "text" fields with the better option from the retrieved relevant codes. 
         Then, generate a valid URL for the (corrected) section.
@@ -447,6 +413,7 @@ def verify_and_complete_response(initial_response, img):
         print(f"Total length of verified_citations JSON (without images): {len(citations_json_without_images)}")
 
         print("Generating summary")
+        stream_logger.info("Generating inspection report...")
         summary_prompt = f"""Generate a brief summary of the following FDA citations in 2-3 sentences. Focus on the key issues identified and their potential impact on food safety or compliance.
 
         Citations:
@@ -491,6 +458,7 @@ def verify_and_complete_response(initial_response, img):
             if response.candidates and response.candidates[0].content.parts:
                 summary_text += response.text
         print(f"Generated summary with length: {len(summary_text)}")
+        stream_logger.info("Finalizing analysis...")
 
         return {
             "citations": verified_citations,
@@ -500,20 +468,13 @@ def verify_and_complete_response(initial_response, img):
     return {"citations": verified_citations, "summary": ""}
 
 def generate_status_stream():
-    """Generate simple status stream with delays"""
-    messages = [
-        ("Initializing image analysis...", 4),
-        ("Processing visual elements...", 4),
-        ("Identifying potential violations...", 4),
-        ("Cross-referencing FDA regulations...", 16),
-        ("Validating citations...", 16),
-        ("Generating inspection report...", 6),
-        ("Finalizing analysis...", 6)
-    ]
-    
-    for msg, delay in messages:
-        yield f'data: {{"type":"status","content":"{msg}"}}\n\n'
-        time.sleep(delay)
+    """Generate status stream from StreamLogger queue"""
+    while True:
+        try:
+            message = stream_logger.queue.get(timeout=1)
+            yield f"data: {message}\n\n"
+        except queue.Empty:
+            yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
 
 @functions_framework.http
 def process_inspection(request):
@@ -530,7 +491,7 @@ def process_inspection(request):
         return ('', 204, headers)
 
     # Handle streaming endpoint
-    if request.method == 'GET' and request.path.endswith('/stream'):
+    if request.method == 'GET' and request.path.endswith('/image-inspection-stream'):
         headers['Content-Type'] = 'text/event-stream'
         headers['Cache-Control'] = 'no-cache'
         headers['Connection'] = 'keep-alive'

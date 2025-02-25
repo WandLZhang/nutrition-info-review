@@ -521,7 +521,7 @@ async function processInspection() {
         const statusElement = document.getElementById('inspectionStatus');
 
         // Start streaming status updates
-        const streamUrl = 'https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection/stream';
+        const streamUrl = 'https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection/image-inspection-stream';
         const analysisStream = new EventSource(streamUrl);
 
         // Wait for streaming to complete
@@ -543,6 +543,8 @@ async function processInspection() {
                             analysisStream.close();
                             resolve();
                         }
+                    } else if (data.type === 'log') {
+                        console.log('Inspection log:', data.content);
                     }
                 } catch (error) {
                     console.error('Error parsing stream data:', error);
