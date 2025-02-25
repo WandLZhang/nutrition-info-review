@@ -506,29 +506,91 @@ async function processInspection() {
         processButton.disabled = true;
         processButton.textContent = 'Processing...';
 
+        // Generate a unique request ID
+        const requestId = Date.now().toString();
+
         // Clear previous results and show status container
         citationResults.innerHTML = `
             <div id="inspectionStatus" class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700">
                 <div class="streaming-loading">
-                    <span>Initializing image analysis...</span>
+                    <span>Connecting to server...</span>
                     <div class="loading-dots">
                         <span>.</span><span>.</span><span>.</span>
                     </div>
                 </div>
             </div>
         `;
-
-        // Call cloud function directly
-        const response = await fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection', {
+        
+        // Connect to the streaming endpoint first with the request ID
+        const statusElement = document.getElementById('inspectionStatus');
+        const streamUrl = `https://us-central1-gemini-med-lit-review.cloudfunctions.net/stream-status?request_id=${requestId}`;
+        const analysisStream = new EventSource(streamUrl);
+        
+        // Initialize processing promise to be awaited later
+        const processingPromise = new Promise((resolve, reject) => {
+            // Listen for stream messages
+            analysisStream.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'status') {
+                        statusElement.innerHTML = `
+                            <div class="streaming-loading">
+                                <span>${data.content}</span>
+                                <div class="loading-dots">
+                                    <span>.</span><span>.</span><span>.</span>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // If we receive the final message, resolve the promise
+                        if (data.content === 'Analysis complete') {
+                            analysisStream.close();
+                            resolve();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error parsing stream data:', error);
+                    analysisStream.close();
+                    reject(error);
+                }
+            };
+            
+            // Handle stream errors
+            analysisStream.onerror = (error) => {
+                console.error('Stream error:', error);
+                analysisStream.close();
+                // Don't reject here - let the main request continue
+            };
+        });
+        
+        // Send the actual processing request in parallel with the request ID
+        const processingRequest = fetch('https://us-central1-gemini-med-lit-review.cloudfunctions.net/process-inspection', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 image: capturedImage,
-                background: background
+                background: background,
+                request_id: requestId
             })
         });
+        
+        // The main processing request must complete, but we'll try to wait for the stream too
+        let streamingComplete = false;
+        
+        // Wait for the stream with a timeout
+        try {
+            const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 30000)); // 30s timeout
+            await Promise.race([processingPromise, timeoutPromise]);
+            streamingComplete = true;
+        } catch (streamError) {
+            console.error('Error with status stream:', streamError);
+            // Continue with the main request even if streaming fails
+        }
+        
+        // Wait for the main processing request
+        const response = await processingRequest;
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -536,22 +598,12 @@ async function processInspection() {
 
         const result = await response.json();
         
-        // Process status updates if they exist
-        if (result.status_updates) {
-            const statusElement = document.getElementById('inspectionStatus');
-            for (const status of result.status_updates) {
-                statusElement.innerHTML = `
-                    <div class="streaming-loading">
-                        <span>${status.message}</span>
-                        <div class="loading-dots">
-                            <span>.</span><span>.</span><span>.</span>
-                        </div>
-                    </div>
-                `;
-                await new Promise(resolve => setTimeout(resolve, status.duration * 1000));
-            }
+        // If streaming didn't complete, close it now
+        if (!streamingComplete && analysisStream) {
+            analysisStream.close();
         }
-
+        
+        // Display the final results
         displayCitations(result.citations, result.summary);
         
         // Keep retake button visible after processing

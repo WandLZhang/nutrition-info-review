@@ -4,6 +4,10 @@ import os
 import json
 import logging
 import functions_framework
+import time
+import flask
+import threading
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from google import genai
 from google.genai import types
@@ -18,6 +22,11 @@ from flask import jsonify, request
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Global variables for tracking processing status
+current_request_id = None
+current_processing_stage = "idle"
+processing_lock = threading.Lock()
 
 # Discovery Engine setup
 PROJECT_ID = "gemini-med-lit-review"
@@ -60,7 +69,7 @@ def search_datastore(query: str, data_store_id: str) -> list:
     request = discoveryengine.SearchRequest(
         serving_config=serving_config,
         query=query,
-        page_size=10,
+        page_size=7,
         query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
             condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO
         ),
@@ -185,6 +194,7 @@ def plot_bounding_box(img, citation, verified_section, index):
     return base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
 
 def generate_initial_response(inspection_type, image_data):
+    print(f"Starting generate_initial_response for {inspection_type}")
     text_prompt = f"""As an FDA inspector performing a {inspection_type} inspection, analyze the given image.
     Based on Title 21 regulations, identify potential citation opportunities and reference 
     the specific sections of Title 21 that apply. Provide a detailed explanation for each 
@@ -216,6 +226,7 @@ def generate_initial_response(inspection_type, image_data):
         )
     ]
 
+    print(f"Sending request to Gemini model with prompt length: {len(text_prompt)}")
     response = genai_client.models.generate_content(
         model="gemini-2.0-flash-001",
         contents=contents,
@@ -247,6 +258,7 @@ def generate_initial_response(inspection_type, image_data):
 If an object is present multiple times, name them according to their unique characteristic (colors, size, position, unique characteristics, etc..).""")]
         )
     )
+    print(f"Received response from Gemini model with length: {len(response.text)}")
 
     try:
         response_text = response.text.strip()
@@ -254,18 +266,27 @@ If an object is present multiple times, name them according to their unique char
         end = response_text.rfind('}') + 1
         if start != -1 and end != -1:
             json_str = response_text[start:end]
-            return json.loads(json_str)
+            parsed_response = json.loads(json_str)
+            print(f"Parsed JSON response with {len(parsed_response['citations'])} citations")
+            return parsed_response
         else:
             raise ValueError("No valid JSON object found in the response")
     except Exception as e:
         logger.error(f"Error formatting response: {str(e)}")
         return {"error": "Failed to parse response"}
 
+def strip_image_from_citations(citations):
+    return [{k: v for k, v in citation.items() if k != 'image'} for citation in citations]
+
 def verify_and_complete_response(initial_response, img):
+    print(f"Starting verify_and_complete_response with {len(initial_response.get('citations', []))} citations")
     verified_citations = []
     for index, citation in enumerate(initial_response.get('citations', [])):
+        print(f"Processing citation {index + 1}")
         relevant_codes = get_relevant_codes(citation['reason'], DATA_STORE_ID)
+        print(f"Retrieved relevant codes with length: {len(relevant_codes)}")
         
+        print(f"Generating verification prompt for citation {index + 1}")
         verification_prompt = f"""Given the following citation and other relevant codes retrieved from the FDA Title 21 regulations, 
         decide which is better and more relevant for the given citation "reason": the original cited section OR another section from the retrieved relevant codes. Use chain of thought. If there is a better section code from the retrieved relevant codes, replace the original cited "section" and "text" fields with the better option from the retrieved relevant codes. 
         Then, generate a valid URL for the (corrected) section.
@@ -294,6 +315,7 @@ def verify_and_complete_response(initial_response, img):
         Note: The '#p-' prefix is required before the section number in the URL.
         
         Ensure that the generated URL is correct and points to the specific section cited."""
+        print(f"Verification prompt length: {len(verification_prompt)}")
 
         generation_config = {
             "max_output_tokens": 8192,
@@ -326,6 +348,7 @@ def verify_and_complete_response(initial_response, img):
             safety_settings=safety_settings,
             stream=True,
         )
+        print(f"Received verification response for citation {index + 1}")
 
         response_text = ""
         for response in responses:
@@ -339,6 +362,7 @@ def verify_and_complete_response(initial_response, img):
             if start != -1 and end != -1:
                 json_str = response_text[start:end]
                 verified_citation = json.loads(json_str)
+                print(f"Parsed verification response for citation {index + 1}")
                 if verified_citation:
                     # Convert image to PIL Image for bounding box
                     img_bytes = io.BytesIO(base64.b64decode(img))
@@ -358,10 +382,23 @@ def verify_and_complete_response(initial_response, img):
 
     # Generate summary after citations are verified
     if verified_citations:
+        print("Verified citations content (with images):")
+        citations_json_with_images = json.dumps(verified_citations, indent=2)
+        print(citations_json_with_images)
+        print(f"Total length of verified_citations JSON (with images): {len(citations_json_with_images)}")
+
+        # Strip images for summary generation
+        citations_without_images = strip_image_from_citations(verified_citations)
+        print("Verified citations content (without images):")
+        citations_json_without_images = json.dumps(citations_without_images, indent=2)
+        print(citations_json_without_images)
+        print(f"Total length of verified_citations JSON (without images): {len(citations_json_without_images)}")
+
+        print("Generating summary")
         summary_prompt = f"""Generate a brief summary of the following FDA citations in 2-3 sentences. Focus on the key issues identified and their potential impact on food safety or compliance.
 
         Citations:
-        {json.dumps(verified_citations, indent=2)}
+        {citations_json_without_images}
 
         Provide your response as a simple string without any JSON formatting or additional markup."""
 
@@ -401,6 +438,7 @@ def verify_and_complete_response(initial_response, img):
         for response in summary_response:
             if response.candidates and response.candidates[0].content.parts:
                 summary_text += response.text
+        print(f"Generated summary with length: {len(summary_text)}")
 
         return {
             "citations": verified_citations,
@@ -410,7 +448,63 @@ def verify_and_complete_response(initial_response, img):
     return {"citations": verified_citations, "summary": ""}
 
 @functions_framework.http
+def stream_status(request):
+    """Stream status updates for the current processing request."""
+    # Enable CORS
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+    }
+    
+    # Get or generate request_id
+    request_id = request.args.get('request_id')
+    if not request_id:
+        return flask.Response("Error: No request_id provided", status=400)
+    
+    # This is a simple streaming response generator
+    def generate():
+        last_stage = None
+        start_time = datetime.now()
+        
+        # Stream for at most 2 minutes
+        while (datetime.now() - start_time).total_seconds() < 120:  # 2-minute timeout
+            with processing_lock:
+                current_stage = current_processing_stage
+                matched_request = (current_request_id == request_id)
+            
+            # If this is for a different request or processing is complete, end
+            if not matched_request and current_stage != "idle":
+                yield f"data: {json.dumps({'type': 'status', 'content': 'Request not being processed'})}\n\n"
+                break
+                
+            # Only send update if stage changed
+            if current_stage != last_stage:
+                if current_stage == "idle" and last_stage is not None:
+                    # Processing complete
+                    yield f"data: {json.dumps({'type': 'status', 'content': 'Analysis complete'})}\n\n"
+                    break
+                elif current_stage != "idle":
+                    # Send status update for current stage
+                    yield f"data: {json.dumps({'type': 'status', 'content': current_stage})}\n\n"
+                    last_stage = current_stage
+            
+            # Sleep before checking again
+            time.sleep(0.5)
+        
+        # Final message if we timeout
+        if (datetime.now() - start_time).total_seconds() >= 120:
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Stream timeout'})}\n\n"
+    
+    # Return the streaming response
+    return flask.Response(generate(), headers=headers)
+
+@functions_framework.http
 def process_inspection(request):
+    global current_request_id, current_processing_stage
+    
+    print("Starting process_inspection")
     # Enable CORS
     if request.method == 'OPTIONS':
         headers = {
@@ -430,34 +524,93 @@ def process_inspection(request):
 
         image_data = request_json.get('image', '').split(',')[1]  # Remove data URL prefix
         inspection_type = request_json.get('background', '')
+        request_id = request_json.get('request_id', str(int(time.time()*1000)))  # Generate if not provided
 
         if not image_data or not inspection_type:
             return jsonify({'error': 'Missing required fields'}), 400, headers
 
-        # Initialize status list
+        # Create status update list for backward compatibility
         status_updates = []
         
-        # Generate initial response with status updates
-        status_updates.append({"message": "Initializing image analysis...", "duration": 0.5})
-        status_updates.append({"message": "Processing visual elements...", "duration": 1.5})
-        status_updates.append({"message": "Identifying potential violations...", "duration": 2})
+        # Set current request as being processed
+        with processing_lock:
+            current_request_id = request_id
+            current_processing_stage = "Initializing image analysis..."
+        
+        status_updates.append({"message": current_processing_stage, "duration": 0.5})
+        
+        # Update status before generating initial response
+        with processing_lock:
+            current_processing_stage = "Processing visual elements..."
+        
+        status_updates.append({"message": current_processing_stage, "duration": 1.5})
+        
+        # Update status before actual processing
+        with processing_lock:
+            current_processing_stage = "Identifying potential violations..."
+        
+        status_updates.append({"message": current_processing_stage, "duration": 2})
+        
+        print("Calling generate_initial_response")
+        # Generate initial response
         initial_response = generate_initial_response(inspection_type, image_data)
+        print(f"Initial response generated with {len(initial_response.get('citations', []))} citations")
         if 'error' in initial_response:
+            print(f"Error in initial response: {initial_response['error']}")
+            # Mark processing as complete
+            with processing_lock:
+                current_processing_stage = "idle"
+                current_request_id = None
             return (jsonify(initial_response), 500, headers)
 
-        # Verify and complete response with status updates
-        status_updates.append({"message": "Cross-referencing FDA regulations...", "duration": 2})
-        status_updates.append({"message": "Validating citations...", "duration": 1.5})
-        status_updates.append({"message": "Generating inspection report...", "duration": 1})
-        status_updates.append({"message": "Finalizing analysis...", "duration": 1.5})
-        verified_response = verify_and_complete_response(initial_response, image_data)
+        # Update status before verification
+        with processing_lock:
+            current_processing_stage = "Cross-referencing FDA regulations..."
         
-        # Add status updates to response
+        status_updates.append({"message": current_processing_stage, "duration": 2})
+        
+        # Update status during verification process
+        with processing_lock:
+            current_processing_stage = "Validating citations..."
+        
+        status_updates.append({"message": current_processing_stage, "duration": 1.5})
+        
+        # Update status before generating report
+        with processing_lock:
+            current_processing_stage = "Generating inspection report..."
+        
+        status_updates.append({"message": current_processing_stage, "duration": 1})
+        
+        # Update status before finalizing
+        with processing_lock:
+            current_processing_stage = "Finalizing analysis..."
+        
+        status_updates.append({"message": current_processing_stage, "duration": 1.5})
+        
+        print("Calling verify_and_complete_response")
+        # Verify and complete response
+        verified_response = verify_and_complete_response(initial_response, image_data)
+        print(f"Verified response generated with {len(verified_response['citations'])} citations")
+        
+        # Mark processing as complete
+        with processing_lock:
+            current_processing_stage = "idle"
+            current_request_id = None
+        
+        # Add status updates to response (keep this for backward compatibility)
         verified_response["status_updates"] = status_updates
+        verified_response["request_id"] = request_id
+        print("Finished process_inspection")
         return (jsonify(verified_response), 200, headers)
 
     except Exception as e:
+        # Mark processing as complete
+        with processing_lock:
+            current_processing_stage = "idle"
+            current_request_id = None
+            
         logger.error(f"Error processing request: {str(e)}")
+        print(f"Error in process_inspection: {str(e)}")
         return (jsonify({"error": str(e)}), 500, headers)
 
 if __name__ == "__main__":
