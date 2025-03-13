@@ -36,7 +36,19 @@
         </div>
     </div>
     <div id="previewArea" class="preview-area hidden">
-        <img id="imagePreview" alt="Captured document">
+        <div class="results-layout">
+            <div class="preview-container">
+                <img id="imagePreview" alt="Captured document">
+            </div>
+            <div class="attributes-container">
+                <div id="attributesDisplay" class="attributes-display">
+                    <h3>Extracted Attributes:</h3>
+                    <div id="attributeName">Name: <span></span></div>
+                    <div id="attributeDOB">Date of Birth: <span></span></div>
+                    <div id="attributeProcedureDate">Date of First Procedure: <span></span></div>
+                </div>
+            </div>
+        </div>
         <div class="button-container">
             <button id="retakeButton" class="action-button">
                 <span class="material-symbols-outlined">refresh</span>

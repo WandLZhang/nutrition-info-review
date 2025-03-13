@@ -70,6 +70,7 @@ fileInput.addEventListener('change', (e) => {
         reader.onload = (e) => {
             capturedImage = e.target.result;
             showPreview(capturedImage);
+            console.log('Image loaded from file, preview should be visible now');
         };
         reader.readAsDataURL(file);
     }
@@ -77,10 +78,14 @@ fileInput.addEventListener('change', (e) => {
 
 // Show preview
 function showPreview(imageData) {
+    console.log('showPreview called with image data');
     imagePreview.src = imageData;
     camera.classList.add('hidden');
     placeholderMessage.classList.add('hidden');
     previewArea.classList.remove('hidden');
+    console.log('Preview area should now be visible, hidden class removed');
+    console.log('previewArea element:', previewArea);
+    console.log('previewArea classes:', previewArea.className);
 }
 
 // Retake photo
@@ -98,7 +103,77 @@ function retakePhoto() {
 // Confirm photo
 function confirmPhoto() {
     console.log('Photo confirmed. Ready for processing.');
-    alert('Photo confirmed. In a real application, this would be sent for processing.');
+
+    if (capturedImage) {
+        // Show loading state
+        const confirmButton = document.getElementById('confirmButton');
+        confirmButton.disabled = true;
+        confirmButton.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span>';
+
+        fetch('https://patient-referral-match-934163632848.us-central1.run.app', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ image: capturedImage })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Backend Response:', data);
+
+            // Get attribute display elements
+            const attributesDisplay = document.getElementById('attributesDisplay');
+            const attributeName = document.getElementById('attributeName').querySelector('span');
+            const attributeDOB = document.getElementById('attributeDOB').querySelector('span');
+            const attributeProcedureDate = document.getElementById('attributeProcedureDate').querySelector('span');
+
+            // Update the display with extracted attributes
+            attributeName.textContent = data.name || 'N/A';
+            attributeDOB.textContent = data.date_of_birth || 'N/A';
+            attributeProcedureDate.textContent = data.date_of_first_procedure || 'N/A';
+
+            // Apply animations for the transition
+            const buttonContainer = document.querySelector('.button-container');
+            const previewArea = document.getElementById('previewArea');
+            const resultsLayout = document.querySelector('.results-layout');
+            const previewContainer = document.querySelector('.preview-container');
+            const attributesContainer = document.querySelector('.attributes-container');
+            
+            // First fade out the buttons
+            buttonContainer.classList.add('fade-out');
+            
+            // After a short delay, switch to results mode layout and animate
+            setTimeout(() => {
+                // Add the results-mode class to change the layout and background
+                previewArea.classList.add('results-mode');
+                resultsLayout.classList.add('results-mode');
+                
+                // Slide the preview to the left
+                previewContainer.classList.add('slide-left');
+                
+                // After the slide animation starts, fade in the attributes
+                setTimeout(() => {
+                    attributesContainer.classList.add('fade-in');
+                }, 300);
+            }, 500);
+        })
+        .catch(error => {
+            console.error('Error sending image to backend:', error);
+            alert('Error sending image to backend: ' + error.message);
+        })
+        .finally(() => {
+            // Reset button state
+            confirmButton.disabled = false;
+            confirmButton.innerHTML = '<span class="material-symbols-outlined">check</span>';
+        });
+    } else {
+        alert('No image captured.');
+    }
 }
 
 // Event Listeners
@@ -110,4 +185,10 @@ confirmButton.addEventListener('click', confirmPhoto);
 // Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
     captureButton.disabled = true; // Disable capture button until camera is on
+    
+    // Ensure preview area is hidden on page load
+    if (previewArea) {
+        previewArea.classList.add('hidden');
+        console.log('Preview area hidden on page load');
+    }
 });
