@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medical Encounter Document Capture</title>
-    <link rel="stylesheet" href="material.css">
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="animations-buttons.css">
+    <link rel="stylesheet" href="cards-containers.css">
+    <link rel="stylesheet" href="tables-data.css">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
 </head>
 <body>
@@ -39,23 +42,65 @@
         <div class="results-layout">
             <div class="preview-container">
                 <img id="imagePreview" alt="Captured document">
+                <div class="button-container">
+                    <button id="retakeButton" class="action-button">
+                        <span class="material-symbols-outlined">refresh</span>
+                    </button>
+                    <button id="confirmButton" class="action-button">
+                        <span class="material-symbols-outlined">check</span>
+                    </button>
+                </div>
             </div>
             <div class="attributes-container">
                 <div id="attributesDisplay" class="attributes-display">
-                    <h3>Extracted Attributes:</h3>
+                    <h3>DocAI + Gemini extracted these core attributes:</h3>
                     <div id="attributeName">Name: <span></span></div>
                     <div id="attributeDOB">Date of Birth: <span></span></div>
                     <div id="attributeProcedureDate">Date of First Procedure: <span></span></div>
                 </div>
+                <div class="attributes-decision">
+                    <button id="editAttributesButton" class="action-button edit-button">
+                        <span class="material-symbols-outlined">edit</span>
+                    </button>
+                    <button id="submitAttributesButton" class="action-button submit-button">
+                        <span class="material-symbols-outlined">check</span>
+                    </button>
+                </div>
             </div>
         </div>
-        <div class="button-container">
-            <button id="retakeButton" class="action-button">
-                <span class="material-symbols-outlined">refresh</span>
-            </button>
-            <button id="confirmButton" class="action-button">
-                <span class="material-symbols-outlined">check</span>
-            </button>
+        
+        <div class="candidates-section hidden" id="candidatesSection">
+            <div id="matchCandidatesContainer" class="match-candidates-container">
+                <h3>These are potential match candidates</h3>
+                <div class="candidates-table-container">
+                    <table class="candidates-table">
+                        <thead>
+                            <tr>
+                                <th>Patient Name</th>
+                                <th>Provisional Diagnosis</th>
+                                <th>Category of Care</th>
+                                <th>Service Requested</th>
+                                <th>Referral Date</th>
+                                <th>Referral Expiration Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="candidatesTableBody">
+                            <!-- Rows will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="rightArrow" class="right-arrow">
+                <span class="material-symbols-outlined">arrow_forward</span>
+            </div>
+        </div>
+        
+        <div class="embeddings-explanation hidden" id="embeddingsExplanation">
+            <h2 class="embeddings-title">There are still multiple referral matches.<br><br>How do we tie the document to the record with the right category?</h2>
+            <div class="embeddings-image-container">
+                <img src="https://raw.githubusercontent.com/williszhang/patient-referral-match/main/frontend/embeddings.png" alt="Embeddings visualization" class="embeddings-image">
+            </div>
+            <p class="embeddings-text">We use LLM embeddings to search the document contents against the referrals.</p>
         </div>
     </div>
     <script src="app.js"></script>

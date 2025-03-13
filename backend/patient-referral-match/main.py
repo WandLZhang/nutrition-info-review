@@ -11,6 +11,7 @@ from PIL import Image
 
 from google import genai
 from google.cloud import storage
+from google.cloud import bigquery
 from google.genai import types
 
 # Configure logging
@@ -31,6 +32,9 @@ genai_client = genai.Client(
 # Initialize GCS client
 storage_client = storage.Client()
 BUCKET_NAME = "gps-rit-patient-referral-match"
+
+# Initialize BigQuery client
+bigquery_client = bigquery.Client()
 
 def extract_patient_attributes(image_data):
     """
@@ -120,16 +124,77 @@ If you cannot find a specific attribute, use an empty string for its value.
             "date_of_first_procedure": ""
         }
 
+def query_patient_referrals(patient_name):
+    """
+    Query BigQuery for patient referrals based on patient name.
+    
+    Args:
+        patient_name: Name of the patient to query
+        
+    Returns:
+        list: List of referral records matching the patient name
+    """
+    print(f"Querying BigQuery for patient referrals with name: {patient_name}")
+    
+    if not patient_name:
+        print("No patient name provided for query")
+        return []
+    
+    try:
+        # Construct the query with parameter
+        query = f"""
+        SELECT * except(content_embedding)
+        FROM `gemini-med-lit-review.patient_records.referrals` 
+        WHERE patient_name = @patient_name
+        """
+        
+        # Set up the query parameters
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("patient_name", "STRING", patient_name)
+            ]
+        )
+        
+        # Execute the query
+        query_job = bigquery_client.query(query, job_config=job_config)
+        
+        # Convert the results to a list of dictionaries
+        results = []
+        for row in query_job:
+            # Convert each row to a dictionary
+            result = {}
+            for key, value in row.items():
+                # Handle different data types appropriately
+                if isinstance(value, (int, float, str, bool)) or value is None:
+                    result[key] = value
+                else:
+                    # Convert non-primitive types to string representation
+                    result[key] = str(value)
+            results.append(result)
+        
+        print(f"Found {len(results)} referral records for patient: {patient_name}")
+        return results
+    
+    except Exception as e:
+        print(f"Error querying BigQuery: {str(e)}")
+        return []
+
 @functions_framework.http
 def process_patient_referral(request):
     """
-    Process a patient referral image:
+    Process patient referral requests:
+    
+    For the main endpoint (/) - Process image:
     1. Delete all existing objects in the GCS bucket
     2. Upload the image to GCS
     3. Extract patient attributes from the image
     4. Return the extracted attributes
+    
+    For the update-attributes endpoint (/update-attributes) - Process attributes:
+    1. Query BigQuery for patient referrals based on patient name
+    2. Return the query results
     """
-    print("Starting process_patient_referral")
+    print(f"Starting process_patient_referral with path: {request.path}")
     # Enable CORS
     headers = {
         'Access-Control-Allow-Origin': '*',
@@ -141,46 +206,74 @@ def process_patient_referral(request):
     if request.method == 'OPTIONS':
         return ('', 204, headers)
 
-    # Handle POST request for patient referral image processing
+    # Handle POST requests
     if request.method == 'POST':
         headers['Content-Type'] = 'application/json'
         try:
             request_json = request.get_json()
             if not request_json:
                 return jsonify({'error': 'No JSON data received'}), 400, headers
+            
+            # Check if this is an update-attributes request
+            if request.path == '/update-attributes':
+                print("Processing update-attributes request")
+                
+                # Get patient attributes from request
+                name = request_json.get('name', '')
+                date_of_birth = request_json.get('date_of_birth', '')
+                date_of_first_procedure = request_json.get('date_of_first_procedure', '')
+                
+                print(f"Received attributes - Name: {name}, DOB: {date_of_birth}, Procedure Date: {date_of_first_procedure}")
+                
+                # Query BigQuery for patient referrals
+                referrals = query_patient_referrals(name)
+                
+                # Return the query results
+                return jsonify({
+                    'attributes': {
+                        'name': name,
+                        'date_of_birth': date_of_birth,
+                        'date_of_first_procedure': date_of_first_procedure
+                    },
+                    'referrals': referrals
+                }), 200, headers
+            
+            # Otherwise, process as an image upload request
+            else:
+                print("Processing image upload request")
+                
+                # Get image data from request
+                image_data = request_json.get('image', '').split(',')[1]  # Remove data URL prefix
+                if not image_data:
+                    return jsonify({'error': 'Missing image data'}), 400, headers
 
-            # Get image data from request
-            image_data = request_json.get('image', '').split(',')[1]  # Remove data URL prefix
-            if not image_data:
-                return jsonify({'error': 'Missing image data'}), 400, headers
-
-            # Initialize GCS bucket
-            bucket = storage_client.bucket(BUCKET_NAME)
-            
-            # Delete all existing objects in the bucket
-            print(f"Deleting all existing objects in bucket {BUCKET_NAME}")
-            blobs = bucket.list_blobs()
-            for blob in blobs:
-                blob.delete()
-                print(f"Deleted blob {blob.name}")
-            
-            # Generate unique filename and upload image to GCS
-            filename = f"patient_referral_{uuid.uuid4()}.jpeg"
-            blob = bucket.blob(filename)
-            
-            # Upload image to GCS
-            image_bytes = base64.b64decode(image_data)
-            blob.upload_from_string(image_bytes, content_type='image/jpeg')
-            print(f"Image uploaded to gs://{BUCKET_NAME}/{filename}")
-            
-            # Extract patient attributes from the image
-            attributes = extract_patient_attributes(image_data)
-            
-            # Return the extracted attributes
-            return jsonify(attributes), 200, headers
+                # Initialize GCS bucket
+                bucket = storage_client.bucket(BUCKET_NAME)
+                
+                # Delete all existing objects in the bucket
+                print(f"Deleting all existing objects in bucket {BUCKET_NAME}")
+                blobs = bucket.list_blobs()
+                for blob in blobs:
+                    blob.delete()
+                    print(f"Deleted blob {blob.name}")
+                
+                # Generate unique filename and upload image to GCS
+                filename = f"patient_referral_{uuid.uuid4()}.jpeg"
+                blob = bucket.blob(filename)
+                
+                # Upload image to GCS
+                image_bytes = base64.b64decode(image_data)
+                blob.upload_from_string(image_bytes, content_type='image/jpeg')
+                print(f"Image uploaded to gs://{BUCKET_NAME}/{filename}")
+                
+                # Extract patient attributes from the image
+                attributes = extract_patient_attributes(image_data)
+                
+                # Return the extracted attributes
+                return jsonify(attributes), 200, headers
 
         except Exception as e:
-            logger.error(f"Error processing patient referral: {str(e)}")
+            logger.error(f"Error processing request: {str(e)}")
             return jsonify({"error": str(e)}), 500, headers
 
     # If not OPTIONS or POST, return method not allowed

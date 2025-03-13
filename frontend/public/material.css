@@ -545,30 +545,30 @@ main {
 }
 
 @keyframes userPulse {
-  0% { 
+  0% {
     opacity: 0.4;
     transform: scale(1);
   }
-  50% { 
+  50% {
     opacity: 1;
     transform: scale(1.1);
   }
-  100% { 
+  100% {
     opacity: 0.4;
     transform: scale(1);
   }
 }
 
 @keyframes botPulse {
-  0% { 
+  0% {
     opacity: 0.6;
     box-shadow: 0 0 0 2px var(--Blue-500);
   }
-  50% { 
+  50% {
     opacity: 1;
     box-shadow: 0 0 0 4px var(--Blue-500);
   }
-  100% { 
+  100% {
     opacity: 0.6;
     box-shadow: 0 0 0 2px var(--Blue-500);
   }
@@ -882,6 +882,12 @@ main {
   to { opacity: 1; }
 }
 
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
 /* Classes for the animations */
 .fade-out {
   animation: fadeOut 0.5s forwards;
@@ -893,6 +899,163 @@ main {
 
 .fade-in {
   animation: fadeIn 0.8s forwards;
+}
+
+/* Candidates Section */
+.candidates-section {
+  position: absolute;
+  top: 50%;
+  right: 5%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 50%;
+  max-width: 550px;
+  transition: opacity 0.5s ease;
+  z-index: 100;
+}
+
+.candidates-section.hidden {
+  display: none;
+}
+
+.candidates-section.fade-in {
+  opacity: 1;
+}
+
+/* Match Candidates Container */
+.match-candidates-container {
+  padding: 1.5rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  transition: opacity 0.5s ease;
+}
+
+.match-candidates-container.fade-in {
+  opacity: 1;
+}
+
+/* Right Arrow Styling */
+.right-arrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+.right-arrow.fade-in {
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.right-arrow .material-symbols-outlined {
+  font-size: 3rem;
+  color: var(--accent-blue);
+  background-color: white;
+  border-radius: 50%;
+  padding: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.match-candidates-container h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #1f2937;
+  font-family: var(--font-heading);
+}
+
+/* Make match candidates header match the attributes display header */
+.attributes-display h3,
+.match-candidates-container h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #1f2937;
+  font-family: var(--font-heading);
+}
+
+/* Table Container with Scroll */
+.candidates-table-container {
+  max-height: 300px; /* Smaller height */
+  overflow-y: auto;
+  border: 1px solid var(--Neutral-20);
+  border-radius: 4px;
+}
+
+/* Table Styling */
+.candidates-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.candidates-table th {
+  background-color: var(--Neutral-10);
+  padding: 8px;
+  text-align: left;
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-size: 0.9rem; /* Slightly smaller than default */
+  font-family: var(--font-heading);
+}
+
+.candidates-table td {
+  padding: 6px 8px; /* Smaller padding */
+  border-top: 1px solid var(--Neutral-20);
+  font-size: 0.8rem; /* Smaller than header font */
+}
+
+/* Date columns width */
+.candidates-table th:nth-child(5),
+.candidates-table th:nth-child(6),
+.candidates-table td:nth-child(5),
+.candidates-table td:nth-child(6) {
+  min-width: 120px; /* Set minimum width for date columns */
+  width: 120px;
+}
+
+.candidates-table tbody tr:hover {
+  background-color: var(--accent-blue-active-bg);
+  cursor: pointer;
+}
+
+/* Tooltip Styling */
+.detail-tooltip {
+  position: absolute;
+  background-color: white;
+  border: 1px solid var(--Neutral-30);
+  border-radius: 4px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 2000; /* Increased z-index to ensure it appears above other elements */
+  max-width: 100%;
+  width: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  pointer-events: none; /* Prevent tooltip from interfering with mouse events */
+}
+
+.detail-tooltip.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tooltip-content {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 16px;
+}
+
+.tooltip-content div {
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 /* Preview Area Styles */
@@ -944,7 +1107,7 @@ main {
 
 .results-mode .preview-container {
   flex: 1;
-  justify-content: flex-end;
+  justify-content: center;
   padding-right: 2rem;
 }
 
@@ -1005,6 +1168,42 @@ main {
   transition: all 0.3s ease;
   width: 90%;
   max-width: 500px;
+}
+
+/* Attributes Decision Styles */
+.attributes-decision {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  width: 90%;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  transform: translateX(-5%); /* Move buttons slightly to the left */
+}
+
+.action-button.edit-button {
+  background-color: #FFC107 !important; /* Yellow color */
+  color: white !important;
+  width: 60px;
+  height: 60px;
+  border-radius: 30px;
+  font-size: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: none !important; /* Disable the opacity-pulse animation */
+}
+
+.action-button.submit-button {
+  background-color: var(--accent-green) !important;
+  color: white !important;
+  width: 60px;
+  height: 60px;
+  border-radius: 30px;
+  font-size: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: none !important; /* Disable the opacity-pulse animation */
 }
 
 .attributes-display.hidden {

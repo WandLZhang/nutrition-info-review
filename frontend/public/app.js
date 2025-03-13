@@ -8,6 +8,8 @@ const previewArea = document.getElementById('previewArea');
 const imagePreview = document.getElementById('imagePreview');
 const retakeButton = document.getElementById('retakeButton');
 const confirmButton = document.getElementById('confirmButton');
+const editAttributesButton = document.getElementById('editAttributesButton');
+const submitAttributesButton = document.getElementById('submitAttributesButton');
 const placeholderMessage = document.querySelector('.placeholder-message');
 
 // State
@@ -176,11 +178,343 @@ function confirmPhoto() {
     }
 }
 
+// Make attributes editable
+function makeAttributesEditable() {
+    console.log('Making attributes editable');
+    const nameSpan = document.getElementById('attributeName').querySelector('span');
+    const dobSpan = document.getElementById('attributeDOB').querySelector('span');
+    const procedureDateSpan = document.getElementById('attributeProcedureDate').querySelector('span');
+    
+    // Make each attribute editable
+    makeSpanEditable(nameSpan);
+    makeSpanEditable(dobSpan);
+    makeSpanEditable(procedureDateSpan);
+}
+
+function makeSpanEditable(span) {
+    // Create an input element
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = span.textContent;
+    input.style.width = '100%';
+    input.style.padding = '4px';
+    input.style.border = '1px solid var(--accent-blue)';
+    input.style.borderRadius = '4px';
+    
+    // Replace the span with the input
+    span.parentNode.replaceChild(input, span);
+    
+    // Store the original span for later use
+    input.originalSpan = span;
+}
+
+// Submit attributes to backend
+function submitAttributes() {
+    console.log('Submitting attributes to backend');
+    
+    // Initialize attributes object
+    const attributes = {};
+    
+    // Check if there are editable inputs
+    const inputs = document.querySelectorAll('.attributes-display input');
+    
+    if (inputs.length > 0) {
+        // If there are inputs, collect their values and convert back to spans
+        inputs.forEach(input => {
+            // Get the attribute name from the parent div's id
+            const attributeId = input.parentNode.id;
+            let attributeName;
+            
+            if (attributeId === 'attributeName') {
+                attributeName = 'name';
+            } else if (attributeId === 'attributeDOB') {
+                attributeName = 'date_of_birth';
+            } else if (attributeId === 'attributeProcedureDate') {
+                attributeName = 'date_of_first_procedure';
+            }
+            
+            // Store the value
+            if (attributeName) {
+                attributes[attributeName] = input.value;
+            }
+            
+            // Convert back to span
+            const span = input.originalSpan;
+            span.textContent = input.value;
+            input.parentNode.replaceChild(span, input);
+        });
+    } else {
+        // If there are no inputs, get values from the spans
+        const nameSpan = document.getElementById('attributeName').querySelector('span');
+        const dobSpan = document.getElementById('attributeDOB').querySelector('span');
+        const procedureDateSpan = document.getElementById('attributeProcedureDate').querySelector('span');
+        
+        attributes.name = nameSpan.textContent;
+        attributes.date_of_birth = dobSpan.textContent;
+        attributes.date_of_first_procedure = procedureDateSpan.textContent;
+    }
+    
+    // Show loading state
+    submitAttributesButton.disabled = true;
+    submitAttributesButton.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span>';
+    
+    // Send the attributes to the backend
+    fetch('https://patient-referral-match-934163632848.us-central1.run.app/update-attributes', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(attributes)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok: ' + response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Attributes updated successfully:', data);
+        
+        // Check if we have referrals data
+        if (data.referrals && Array.isArray(data.referrals)) {
+            // Populate the match candidates table
+            populateMatchCandidates(data.referrals);
+            
+            // Fade out the attributes container
+            const attributesContainer = document.querySelector('.attributes-container');
+            attributesContainer.classList.add('fade-out');
+            
+            // After fade-out completes, show the match candidates container
+            setTimeout(() => {
+                attributesContainer.style.display = 'none';
+                const candidatesSection = document.getElementById('candidatesSection');
+                candidatesSection.classList.remove('hidden');
+                candidatesSection.classList.add('fade-in');
+            }, 500); // Match the CSS transition duration
+        } else {
+            // If no referrals data, show a simple success message
+            alert('Attributes updated successfully!');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating attributes:', error);
+        alert('Error updating attributes: ' + error.message);
+    })
+    .finally(() => {
+        // Reset button state
+        submitAttributesButton.disabled = false;
+        submitAttributesButton.innerHTML = '<span class="material-symbols-outlined">check</span>';
+    });
+}
+
+// Populate match candidates table
+function populateMatchCandidates(referrals) {
+    const tableBody = document.getElementById('candidatesTableBody');
+    tableBody.innerHTML = ''; // Clear existing rows
+    
+    referrals.forEach(referral => {
+        const row = document.createElement('tr');
+        
+        // Add the visible columns
+        row.innerHTML = `
+            <td>${referral.patient_name || 'N/A'}</td>
+            <td>${referral.provisional_diagnosis || 'N/A'}</td>
+            <td>${referral.category_of_care || 'N/A'}</td>
+            <td>${referral.service_requested || 'N/A'}</td>
+            <td>${referral.referral_date || 'N/A'}</td>
+            <td>${referral.referral_expiration_date || 'N/A'}</td>
+        `;
+        
+        // Store all other attributes as data attributes for hover display
+        Object.keys(referral).forEach(key => {
+            if (!['patient_name', 'provisional_diagnosis', 'category_of_care', 'service_requested', 'referral_date', 'referral_expiration_date'].includes(key)) {
+                row.dataset[key] = referral[key] || '';
+            }
+        });
+        
+        // Add hover event listeners
+        row.addEventListener('mouseenter', showDetailTooltip);
+        row.addEventListener('mouseleave', hideDetailTooltip);
+        
+        tableBody.appendChild(row);
+    });
+    
+    // Show the right arrow after the match candidates are populated
+    setTimeout(() => {
+        const rightArrow = document.getElementById('rightArrow');
+        rightArrow.classList.add('fade-in');
+    }, 800); // Delay to show after the match candidates container is fully visible
+}
+
+// Show tooltip with additional details on hover
+function showDetailTooltip(event) {
+    const row = event.currentTarget;
+    
+    // Create tooltip if it doesn't exist
+    let tooltip = document.getElementById('detailTooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'detailTooltip';
+        tooltip.className = 'detail-tooltip';
+        document.body.appendChild(tooltip);
+    }
+    
+    // Populate tooltip with all data attributes
+    let tooltipContent = '<div class="tooltip-content">';
+    
+    // Use the schema to ensure we display all attributes in the correct order
+    [
+        "dob", "age", "referring_facility", "referring_facility_phone", 
+        "referring_facility_fax", "referring_provider", "npi", "priority", 
+        "clinically_indicated_date", "referral_category", "level_of_care_coordination"
+    ].forEach(key => {
+        if (row.dataset[key]) {
+            // Format the key for display (replace underscores with spaces, capitalize)
+            const formattedKey = key.replace(/_/g, ' ')
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            
+            tooltipContent += `<div><strong>${formattedKey}:</strong> ${row.dataset[key]}</div>`;
+        }
+    });
+    
+    tooltipContent += '</div>';
+    tooltip.innerHTML = tooltipContent;
+    
+    // Position the tooltip below the row
+    const rowRect = row.getBoundingClientRect();
+    tooltip.style.top = `${rowRect.bottom + window.scrollY + 5}px`; // 5px gap
+    tooltip.style.left = `${rowRect.left + window.scrollX}px`;
+    
+    // Show the tooltip - ensure it's visible by removing any existing class first
+    tooltip.classList.remove('visible');
+    // Force a reflow to ensure the class change takes effect
+    void tooltip.offsetWidth;
+    // Add the visible class
+    tooltip.classList.add('visible');
+}
+
+// Hide tooltip when mouse leaves the row
+function hideDetailTooltip() {
+    const tooltip = document.getElementById('detailTooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+        // Optionally, move the tooltip off-screen to ensure it's not blocking anything
+        tooltip.style.top = '-9999px';
+        tooltip.style.left = '-9999px';
+    }
+}
+
 // Event Listeners
 cameraToggle.addEventListener('click', toggleCamera);
 captureButton.addEventListener('click', captureFrame);
 retakeButton.addEventListener('click', retakePhoto);
 confirmButton.addEventListener('click', confirmPhoto);
+editAttributesButton.addEventListener('click', makeAttributesEditable);
+submitAttributesButton.addEventListener('click', submitAttributes);
+const rightArrow = document.getElementById('rightArrow');
+rightArrow.addEventListener('click', handleRightArrowClick);
+
+// Handle right arrow click to change text and apply date filtering
+function handleRightArrowClick() {
+    // Add clicked class to the arrow for visual feedback
+    const rightArrow = document.getElementById('rightArrow');
+    rightArrow.classList.add('clicked');
+    
+    // First step: Change the header text and apply date filtering
+    const header = document.querySelector('.match-candidates-container h3');
+    header.classList.add('fade-out');
+    
+    setTimeout(() => {
+        header.textContent = "Thanks to DocAI, we filter procedure date vs. referral expiration";
+        header.classList.remove('fade-out');
+        header.classList.add('fade-in');
+        
+        // Apply color coding to table rows
+        applyDateFilterHighlighting();
+        
+        // After a delay, start the fade to white transition
+        setTimeout(() => {
+            // Get the preview area and add the fade-to-white class
+            const previewArea = document.getElementById('previewArea');
+            previewArea.classList.add('fade-to-white');
+            
+            // After the fade to white completes, hide the candidates section and show the embeddings explanation
+            setTimeout(() => {
+                // Hide the candidates section and preview container
+                const candidatesSection = document.getElementById('candidatesSection');
+                candidatesSection.classList.add('hidden');
+                
+                // Hide the preview container and attributes container
+                const previewContainer = document.querySelector('.preview-container');
+                previewContainer.style.display = 'none';
+                
+                const attributesContainer = document.querySelector('.attributes-container');
+                attributesContainer.style.display = 'none';
+                
+                // Show the embeddings explanation
+                const embeddingsExplanation = document.getElementById('embeddingsExplanation');
+                embeddingsExplanation.classList.remove('hidden');
+                embeddingsExplanation.classList.add('visible');
+                
+                // Animate the elements sequentially
+                const embeddingsTitle = document.querySelector('.embeddings-title');
+                const embeddingsImageContainer = document.querySelector('.embeddings-image-container');
+                const embeddingsText = document.querySelector('.embeddings-text');
+                
+                // Animate title
+                embeddingsTitle.classList.add('animate');
+                
+                // Animate image after a delay (animation-delay is set in CSS)
+                embeddingsImageContainer.classList.add('animate');
+                
+                // Animate text after a delay (animation-delay is set in CSS)
+                embeddingsText.classList.add('animate');
+                
+            }, 1500); // Wait for the fade to white to complete
+            
+        }, 2000); // Wait for the user to see the filtered results before fading to white
+        
+    }, 500); // Match the CSS transition duration for the header fade
+}
+
+// Apply highlighting to table rows based on date comparison
+function applyDateFilterHighlighting() {
+    // Get all table rows
+    const tableRows = document.querySelectorAll('#candidatesTableBody tr');
+    
+    // Get the procedure date from the attributes display
+    const procedureDateText = document.getElementById('attributeProcedureDate').querySelector('span').textContent;
+    const procedureDate = new Date(procedureDateText);
+    
+    // Process each row
+    tableRows.forEach(row => {
+        // Get referral date and expiration date from the row
+        const referralDateText = row.cells[4].textContent;
+        const expirationDateText = row.cells[5].textContent;
+        
+        // Parse dates (handle 'N/A' values)
+        const referralDate = referralDateText !== 'N/A' ? new Date(referralDateText) : null;
+        const expirationDate = expirationDateText !== 'N/A' ? new Date(expirationDateText) : null;
+        
+        // Check if procedure date is within range
+        let isWithinRange = false;
+        
+        if (referralDate && expirationDate && !isNaN(procedureDate.getTime())) {
+            isWithinRange = procedureDate >= referralDate && procedureDate <= expirationDate;
+        }
+        
+        // Apply appropriate styling
+        if (isWithinRange) {
+            row.style.backgroundColor = 'rgba(52, 168, 83, 0.2)'; // Light green
+            row.style.color = '#1e7e34'; // Darker green for text
+        } else {
+            row.style.backgroundColor = 'rgba(234, 67, 53, 0.2)'; // Light red
+            row.style.color = '#d32f2f'; // Darker red for text
+        }
+    });
+}
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
