@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "gps-rit-fda-inspection",
+    "site": "patient-referral-match",
     "public": "public",
     "ignore": [
       "firebase.json",
