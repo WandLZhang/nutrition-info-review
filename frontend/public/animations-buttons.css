@@ -593,68 +593,43 @@
   background-color: var(--accent-blue);
 }
 
-/* Embeddings Explanation */
-.embeddings-explanation {
+/* Blue Arrow */
+.blue-arrow {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
-  opacity: 0;
-  transition: opacity 0.8s ease;
-}
-
-.embeddings-explanation.visible {
+  align-items: center;
+  position: absolute;
+  right: 5%;
+  top: 50%;
+  transform: translateY(-50%);
   opacity: 1;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  animation: pulse 2s infinite ease-in-out;
 }
 
-.embeddings-title {
-  font-size: 1.8rem;
-  font-weight: 600;
-  color: #1f2937;
-  text-align: center;
-  margin-bottom: 2rem;
-  opacity: 0;
+.blue-arrow .material-symbols-outlined {
+  font-size: 3rem;
+  color: white;
+  background-color: #1a73e8; /* Blue color */
+  border-radius: 50%;
+  padding: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
 }
 
-.embeddings-title.animate {
-  animation: sequentialFadeIn 1s forwards;
+/* Hover state - make arrow slightly larger with enhanced shadow */
+.blue-arrow:hover .material-symbols-outlined {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.embeddings-image-container {
-  width: 100%;
-  max-width: 600px;
-  margin: 1rem 0;
-  opacity: 0;
+/* Active state - make arrow appear pressed */
+.blue-arrow:active .material-symbols-outlined {
+  transform: scale(0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.embeddings-image-container.animate {
-  animation: sequentialFadeIn 1s forwards;
-  animation-delay: 1s;
-}
-
-.embeddings-image {
-  width: 100%;
-  height: auto;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.embeddings-text {
-  font-size: 1.2rem;
-  color: #4b5563;
-  text-align: center;
-  margin-top: 1.5rem;
-  opacity: 0;
-}
-
-.embeddings-text.animate {
-  animation: sequentialFadeIn 1s forwards;
-  animation-delay: 2s;
-}
 
 .fade-to-white {
   animation: fadeToWhite 1.5s forwards;

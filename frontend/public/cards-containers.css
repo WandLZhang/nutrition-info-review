@@ -274,10 +274,162 @@
   width: 80%;
   max-width: 800px;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 2rem;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.embeddings-explanation.visible {
+  opacity: 1;
 }
 
 .embeddings-explanation.hidden {
   display: none;
+}
+
+.embeddings-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #1f2937;
+  text-align: center;
+  margin-bottom: 1rem;
+  opacity: 0;
+}
+
+.embeddings-title.animate {
+  animation: sequentialFadeIn 1s forwards;
+}
+
+.embeddings-image-container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0;
+  padding-left: 40px; /* Move the image slightly to the right */
+  opacity: 0;
+}
+
+.embeddings-image-container.animate {
+  animation: sequentialFadeIn 1s forwards;
+  animation-delay: 1s;
+}
+
+.embeddings-image {
+  width: 100%;
+  height: 300px; /* Fixed height to allow cropping */
+  object-fit: cover; /* Crop the image to fill the container */
+  object-position: center 40%; /* Adjust vertical position to crop more from top than bottom */
+  border-radius: 0;
+}
+
+/* Override the general preview-area img styles for embeddings image */
+.embeddings-explanation .embeddings-image {
+  box-shadow: none;
+  margin-bottom: 0;
+  border-radius: 0;
+}
+
+.embeddings-text {
+  font-size: 1.2rem;
+  color: #4b5563;
+  text-align: center;
+  margin-top: 0.25rem;
+  opacity: 0;
+}
+
+.embeddings-text.animate {
+  animation: sequentialFadeIn 1s forwards;
+  animation-delay: 2s;
+}
+
+/* Rankings Section */
+.rankings-section {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: white;
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.rankings-section.visible {
+  opacity: 1;
+}
+
+.rankings-section.hidden {
+  display: none;
+}
+
+.rankings-section .preview-container {
+  position: absolute;
+  top: 50%;
+  left: 30%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.8s ease;
+}
+
+.rankings-section .preview-container img {
+  max-width: 90%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.rankings-container {
+  position: absolute;
+  top: 50%;
+  right: 5%;
+  transform: translateY(-50%);
+  width: 50%;
+  max-width: 550px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: opacity 0.5s ease;
+  z-index: 100;
+}
+
+.rankings-card {
+  width: 100%;
+  padding: 1.5rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.rankings-card h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #1f2937;
+  font-family: var(--font-heading);
+}
+
+/* Rankings table styling - strong first row, weaker others */
+#rankingsList tr:nth-child(1) {
+  background-color: rgba(52, 168, 83, 0.4); /* Strong green */
+}
+
+#rankingsList tr:nth-child(n+2) {
+  background-color: rgba(52, 168, 83, 0.1); /* Considerably weaker green for all other rows */
+}
+
+#rankingsList td:last-child {
+  font-weight: 600;
+  color: #34a853; /* Green color for the distance value */
 }
 
 /* Match Candidates Container */

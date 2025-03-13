@@ -21,10 +21,13 @@ referral_embeddings AS (
         content_embedding
     FROM
         `patient_records.referrals`
+        WHERE 
+        -- Example procedure date '2025-03-01' - this would be replaced with a parameter from frontend
+        DATE('2025-03-01') BETWEEN referral_date AND referral_expiration_date
 )
 -- Create the vector search results table
 SELECT 
-  base.patient_name, base.dob, base.age, distance FROM VECTOR_SEARCH ( TABLE patient_records.referrals,
+  base.*, distance FROM VECTOR_SEARCH ( TABLE patient_records.referrals,
       'content_embedding',
       TABLE image_embeddings,
       top_k => 3 )

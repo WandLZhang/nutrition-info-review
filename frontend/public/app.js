@@ -11,6 +11,10 @@ const confirmButton = document.getElementById('confirmButton');
 const editAttributesButton = document.getElementById('editAttributesButton');
 const submitAttributesButton = document.getElementById('submitAttributesButton');
 const placeholderMessage = document.querySelector('.placeholder-message');
+const embeddingsBlueArrow = document.getElementById('embeddingsBlueArrow');
+const rankingsSection = document.getElementById('rankingsSection');
+const rankingsImagePreview = document.getElementById('rankingsImagePreview');
+const rankingsList = document.getElementById('rankingsList');
 
 // State
 let isCameraOn = false;
@@ -362,21 +366,15 @@ function showDetailTooltip(event) {
     // Populate tooltip with all data attributes
     let tooltipContent = '<div class="tooltip-content">';
     
-    // Use the schema to ensure we display all attributes in the correct order
-    [
-        "dob", "age", "referring_facility", "referring_facility_phone", 
-        "referring_facility_fax", "referring_provider", "npi", "priority", 
-        "clinically_indicated_date", "referral_category", "level_of_care_coordination"
-    ].forEach(key => {
-        if (row.dataset[key]) {
-            // Format the key for display (replace underscores with spaces, capitalize)
-            const formattedKey = key.replace(/_/g, ' ')
-                .split(' ')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' ');
-            
-            tooltipContent += `<div><strong>${formattedKey}:</strong> ${row.dataset[key]}</div>`;
-        }
+    // Get all data attributes and display them
+    Object.keys(row.dataset).forEach(key => {
+        // Format the key for display (replace underscores with spaces, capitalize)
+        const formattedKey = key.replace(/_/g, ' ')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+        
+        tooltipContent += `<div><strong>${formattedKey}:</strong> ${row.dataset[key]}</div>`;
     });
     
     tooltipContent += '</div>';
@@ -415,68 +413,81 @@ editAttributesButton.addEventListener('click', makeAttributesEditable);
 submitAttributesButton.addEventListener('click', submitAttributes);
 const rightArrow = document.getElementById('rightArrow');
 rightArrow.addEventListener('click', handleRightArrowClick);
+embeddingsBlueArrow.addEventListener('click', handleBlueArrowClick);
 
 // Handle right arrow click to change text and apply date filtering
 function handleRightArrowClick() {
-    // Add clicked class to the arrow for visual feedback
+    // Get the right arrow element
     const rightArrow = document.getElementById('rightArrow');
-    rightArrow.classList.add('clicked');
     
-    // First step: Change the header text and apply date filtering
-    const header = document.querySelector('.match-candidates-container h3');
-    header.classList.add('fade-out');
-    
-    setTimeout(() => {
-        header.textContent = "Thanks to DocAI, we filter procedure date vs. referral expiration";
-        header.classList.remove('fade-out');
-        header.classList.add('fade-in');
+    // Check if we're already in the filtered state
+    if (rightArrow.dataset.state === 'filtered') {
+        // We're in the filtered state, so proceed to embeddings explanation
         
-        // Apply color coding to table rows
-        applyDateFilterHighlighting();
+        // Get the preview area and add the fade-to-white class
+        const previewArea = document.getElementById('previewArea');
+        previewArea.classList.add('fade-to-white');
         
-        // After a delay, start the fade to white transition
+        // Hide the candidates section and preview container
+        const candidatesSection = document.getElementById('candidatesSection');
+        candidatesSection.classList.add('hidden');
+        
+        // Hide the preview container and attributes container
+        const previewContainer = document.querySelector('.preview-container');
+        previewContainer.style.display = 'none';
+        
+        const attributesContainer = document.querySelector('.attributes-container');
+        attributesContainer.style.display = 'none';
+        
+        // Show the embeddings explanation
+        const embeddingsExplanation = document.getElementById('embeddingsExplanation');
+        embeddingsExplanation.classList.remove('hidden');
+        embeddingsExplanation.classList.add('visible');
+        
+        // Animate the elements sequentially
+        const embeddingsTitle = document.querySelector('.embeddings-title');
+        const embeddingsImageContainer = document.querySelector('.embeddings-image-container');
+        const embeddingsText = document.querySelector('.embeddings-text');
+        
+        // Animate title
+        embeddingsTitle.classList.add('animate');
+        
+        // Animate image after a delay (animation-delay is set in CSS)
+        embeddingsImageContainer.classList.add('animate');
+        
+        // Animate text after a delay (animation-delay is set in CSS)
+        embeddingsText.classList.add('animate');
+        
+    } else {
+        // First time clicking - change to filtered state
+        rightArrow.classList.add('clicked');
+        
+        // Change the header text and apply date filtering
+        const header = document.querySelector('.match-candidates-container h3');
+        header.classList.add('fade-out');
+        
         setTimeout(() => {
-            // Get the preview area and add the fade-to-white class
-            const previewArea = document.getElementById('previewArea');
-            previewArea.classList.add('fade-to-white');
+            header.textContent = "Thanks to DocAI, we filter procedure date vs. referral expiration";
+            header.classList.remove('fade-out');
+            header.classList.add('fade-in');
             
-            // After the fade to white completes, hide the candidates section and show the embeddings explanation
+            // Apply color coding to table rows
+            applyDateFilterHighlighting();
+            
+            // Update the arrow text to indicate next action
+            rightArrow.querySelector('.material-symbols-outlined').textContent = 'arrow_forward';
+            
+            // Mark the arrow as being in the filtered state
+            rightArrow.dataset.state = 'filtered';
+            
+            // Update the arrow's appearance to make it clear it's clickable
+            rightArrow.classList.remove('clicked');
             setTimeout(() => {
-                // Hide the candidates section and preview container
-                const candidatesSection = document.getElementById('candidatesSection');
-                candidatesSection.classList.add('hidden');
-                
-                // Hide the preview container and attributes container
-                const previewContainer = document.querySelector('.preview-container');
-                previewContainer.style.display = 'none';
-                
-                const attributesContainer = document.querySelector('.attributes-container');
-                attributesContainer.style.display = 'none';
-                
-                // Show the embeddings explanation
-                const embeddingsExplanation = document.getElementById('embeddingsExplanation');
-                embeddingsExplanation.classList.remove('hidden');
-                embeddingsExplanation.classList.add('visible');
-                
-                // Animate the elements sequentially
-                const embeddingsTitle = document.querySelector('.embeddings-title');
-                const embeddingsImageContainer = document.querySelector('.embeddings-image-container');
-                const embeddingsText = document.querySelector('.embeddings-text');
-                
-                // Animate title
-                embeddingsTitle.classList.add('animate');
-                
-                // Animate image after a delay (animation-delay is set in CSS)
-                embeddingsImageContainer.classList.add('animate');
-                
-                // Animate text after a delay (animation-delay is set in CSS)
-                embeddingsText.classList.add('animate');
-                
-            }, 1500); // Wait for the fade to white to complete
+                rightArrow.classList.add('fade-in');
+            }, 300);
             
-        }, 2000); // Wait for the user to see the filtered results before fading to white
-        
-    }, 500); // Match the CSS transition duration for the header fade
+        }, 500); // Match the CSS transition duration for the header fade
+    }
 }
 
 // Apply highlighting to table rows based on date comparison
@@ -513,6 +524,122 @@ function applyDateFilterHighlighting() {
             row.style.backgroundColor = 'rgba(234, 67, 53, 0.2)'; // Light red
             row.style.color = '#d32f2f'; // Darker red for text
         }
+    });
+}
+
+// Handle blue arrow click to get semantic search rankings
+function handleBlueArrowClick() {
+    // Add loading state to the arrow
+    embeddingsBlueArrow.classList.add('loading');
+    embeddingsBlueArrow.querySelector('.material-symbols-outlined').textContent = 'hourglass_empty';
+    
+    // Get the procedure date from the attributes display
+    const procedureDateText = document.getElementById('attributeProcedureDate').querySelector('span').textContent;
+    
+    // Call the backend to get semantic search rankings
+    fetch('https://patient-referral-match-934163632848.us-central1.run.app/semantic-search', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ date_of_first_procedure: procedureDateText })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok: ' + response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Semantic search results:', data);
+        
+        // Copy the current image to the rankings image preview
+        rankingsImagePreview.src = imagePreview.src;
+        
+        // Populate the rankings list
+        populateRankings(data.rankings || []);
+        
+        // Fade out the embeddings explanation
+        const embeddingsExplanation = document.getElementById('embeddingsExplanation');
+        embeddingsExplanation.classList.add('fade-out');
+        
+        // After fade-out completes, show the rankings section
+        setTimeout(() => {
+            embeddingsExplanation.classList.add('hidden');
+            rankingsSection.classList.remove('hidden');
+            
+            // After a short delay, fade in the rankings section
+            setTimeout(() => {
+                rankingsSection.classList.add('visible');
+                
+                // Add fade-in class to the rankings container for smooth appearance
+                const rankingsContainer = document.getElementById('rankingsContainer');
+                if (rankingsContainer) {
+                    rankingsContainer.classList.add('fade-in');
+                }
+            }, 100);
+        }, 500);
+    })
+    .catch(error => {
+        console.error('Error getting semantic search rankings:', error);
+        alert('Error getting semantic search rankings: ' + error.message);
+    })
+    .finally(() => {
+        // Reset the arrow state
+        embeddingsBlueArrow.classList.remove('loading');
+        embeddingsBlueArrow.querySelector('.material-symbols-outlined').textContent = 'arrow_forward';
+    });
+}
+
+// Populate rankings list
+function populateRankings(rankings) {
+    rankingsList.innerHTML = ''; // Clear existing items
+    
+    // If no rankings, show a message
+    if (!rankings.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 4;
+        cell.textContent = 'No matching referrals found';
+        cell.style.textAlign = 'center';
+        row.appendChild(cell);
+        rankingsList.appendChild(row);
+        return;
+    }
+    
+    // Add each ranking item as a table row
+    rankings.forEach((ranking, index) => {
+        const row = document.createElement('tr');
+        
+        // Create cells for each column
+        const nameCell = document.createElement('td');
+        nameCell.textContent = ranking.patient_name || 'Unknown Patient';
+        
+        const facilityCell = document.createElement('td');
+        facilityCell.textContent = ranking.referring_facility || 'N/A';
+        
+        const serviceCell = document.createElement('td');
+        serviceCell.textContent = ranking.service_requested || 'N/A';
+        
+        const distanceCell = document.createElement('td');
+        distanceCell.textContent = ranking.distance ? ranking.distance.toFixed(4) : 'N/A';
+        
+        // Append cells to row
+        row.appendChild(nameCell);
+        row.appendChild(facilityCell);
+        row.appendChild(serviceCell);
+        row.appendChild(distanceCell);
+        
+        // Store all attributes as data attributes for hover display
+        Object.keys(ranking).forEach(key => {
+            row.dataset[key] = ranking[key] || '';
+        });
+        
+        // Add hover event listeners for tooltip
+        row.addEventListener('mouseenter', showDetailTooltip);
+        row.addEventListener('mouseleave', hideDetailTooltip);
+        
+        rankingsList.appendChild(row);
     });
 }
 

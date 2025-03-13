@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Encounter Document Capture</title>
+    <title>Patient Referral Match</title>
     <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="animations-buttons.css">
     <link rel="stylesheet" href="cards-containers.css">
@@ -98,9 +98,38 @@
         <div class="embeddings-explanation hidden" id="embeddingsExplanation">
             <h2 class="embeddings-title">There are still multiple referral matches.<br><br>How do we tie the document to the record with the right category?</h2>
             <div class="embeddings-image-container">
-                <img src="https://raw.githubusercontent.com/williszhang/patient-referral-match/main/frontend/embeddings.png" alt="Embeddings visualization" class="embeddings-image">
+                <img src="embeddings.png" alt="Embeddings visualization" class="embeddings-image">
             </div>
             <p class="embeddings-text">We use LLM embeddings to search the document contents against the referrals.</p>
+            <div id="embeddingsBlueArrow" class="blue-arrow">
+                <span class="material-symbols-outlined">arrow_forward</span>
+            </div>
+        </div>
+        
+        <div class="rankings-section hidden" id="rankingsSection">
+            <div class="preview-container">
+                <img id="rankingsImagePreview" alt="Captured document">
+            </div>
+            <div id="rankingsContainer" class="rankings-container">
+                <div class="rankings-card">
+                    <h3>Based on semantic search, here are the rankings of best matches</h3>
+                    <div class="candidates-table-container">
+                        <table class="candidates-table">
+                            <thead>
+                                <tr>
+                                    <th>Patient Name</th>
+                                    <th>Referring Facility</th>
+                                    <th>Service Requested</th>
+                                    <th>Semantic Distance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankingsList">
+                                <!-- Rankings will be populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <script src="app.js"></script>

@@ -179,6 +179,124 @@ def query_patient_referrals(patient_name):
         print(f"Error querying BigQuery: {str(e)}")
         return []
 
+def perform_vector_search(procedure_date):
+    """
+    Perform vector search using BigQuery to find matching referrals based on procedure date.
+    
+    Args:
+        procedure_date: Date of first procedure from frontend
+        
+    Returns:
+        list: List of raw referral records from vector search
+    """
+    print(f"Performing vector search with procedure date: {procedure_date}")
+    
+    if not procedure_date:
+        print("No procedure date provided for vector search")
+        return []
+    
+    try:
+        # Use Gemini to parse the date string to a format BigQuery can understand (YYYY-MM-DD)
+        text_prompt = f"""
+        Parse the following date string: "{procedure_date}"
+        
+        Return ONLY the date in YYYY-MM-DD format (e.g., 2025-03-12).
+        Do not include any other text or explanation in your response.
+        """
+        
+        # Prepare the content for Gemini
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text=text_prompt)
+                ]
+            )
+        ]
+        
+        # Generate content with Gemini
+        print("Sending request to Gemini model for date parsing")
+        response = genai_client.models.generate_content(
+            model="gemini-2.0-flash-001",  # Use the same model as elsewhere in the code
+            contents=contents,
+            config=types.GenerateContentConfig(
+                temperature=0.0,  # Use deterministic results for date parsing
+                max_output_tokens=10,  # We only need a short response
+                response_modalities=["TEXT"],
+            )
+        )
+        
+        # Get the parsed date
+        formatted_date = response.text.strip()
+        print(f"Gemini parsed date '{procedure_date}' to '{formatted_date}'")
+        
+        # Construct the vector search query with parameter
+        query = """
+        -- Use a WITH clause for the image embeddings
+        WITH image_embeddings AS (
+          SELECT *
+          FROM
+            ML.GENERATE_EMBEDDING(
+              MODEL `patient_records.multimodal_embedding_model`,
+              (SELECT * FROM `patient_records.encounters` WHERE content_type = 'image/jpeg')
+            )
+        )
+        -- Create the vector search results table
+        SELECT 
+          base.* except(content_embedding), distance FROM VECTOR_SEARCH ((SELECT
+                patient_name,
+                dob,
+                referring_facility,
+                referring_provider,
+                provisional_diagnosis,
+                referral_date,
+                referral_expiration_date,
+                category_of_care,
+                service_requested,
+                content_embedding
+            FROM
+                `patient_records.referrals`
+                WHERE 
+                -- Use procedure date from frontend
+                @procedure_date BETWEEN referral_date AND referral_expiration_date),
+              'content_embedding',
+              TABLE image_embeddings,
+              top_k => 21 )
+            ORDER BY distance ASC
+        """
+        
+        # Set up the query parameters
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("procedure_date", "DATE", formatted_date)
+            ]
+        )
+        
+        # Execute the query
+        query_job = bigquery_client.query(query, job_config=job_config)
+        
+        # Convert the results to a list of dictionaries
+        results = []
+        for row in query_job:
+            # Convert each row to a dictionary
+            result = {}
+            for key, value in row.items():
+                # Handle different data types appropriately
+                if isinstance(value, (int, float, str, bool)) or value is None:
+                    result[key] = value
+                else:
+                    # Convert non-primitive types to string representation
+                    result[key] = str(value)
+            
+            results.append(result)
+        
+        print(f"Found {len(results)} vector search results")
+        return results
+    
+    except Exception as e:
+        print(f"Error performing vector search: {str(e)}")
+        return []
+
 @functions_framework.http
 def process_patient_referral(request):
     """
@@ -193,6 +311,11 @@ def process_patient_referral(request):
     For the update-attributes endpoint (/update-attributes) - Process attributes:
     1. Query BigQuery for patient referrals based on patient name
     2. Return the query results
+    
+    For the semantic-search endpoint (/semantic-search) - Process vector search:
+    1. Get procedure date from request
+    2. Perform vector search using the procedure date
+    3. Return the vector search results
     """
     print(f"Starting process_patient_referral with path: {request.path}")
     # Enable CORS
@@ -214,8 +337,25 @@ def process_patient_referral(request):
             if not request_json:
                 return jsonify({'error': 'No JSON data received'}), 400, headers
             
+            # Check if this is a semantic-search request
+            if request.path == '/semantic-search':
+                print("Processing semantic-search request")
+                
+                # Get procedure date from request
+                date_of_first_procedure = request_json.get('date_of_first_procedure', '')
+                
+                print(f"Received procedure date: {date_of_first_procedure}")
+                
+                # Perform vector search
+                rankings = perform_vector_search(date_of_first_procedure)
+                
+                # Return the vector search results
+                return jsonify({
+                    'rankings': rankings
+                }), 200, headers
+            
             # Check if this is an update-attributes request
-            if request.path == '/update-attributes':
+            elif request.path == '/update-attributes':
                 print("Processing update-attributes request")
                 
                 # Get patient attributes from request
