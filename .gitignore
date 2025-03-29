@@ -3,12 +3,6 @@ node_modules
 __pycache__
 *.pyc
 
-# Project specific
-backend/archive
-backend/create-rag-datastore/processed_documents
-backend/image-inspection/test1/
-frontend/test/template_app.txt
-
 # Environment Variables
 **/.env
 **/.env.local
@@ -21,5 +15,4 @@ frontend/test/template_app.txt
 *.log
 firebase-debug.log*
 frontend/firebase-debug.log
-backend/function-site-check/javascript-function/.env.gemini-med-lit-review
 frontend/.firebase/hosting.cHVibGlj.cache

@@ -21,6 +21,107 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // Add event listener for the submit button
+    const submitButton = document.getElementById('submitButton');
+    if (submitButton && searchInput) {
+        console.log('Found submit button, adding event listener');
+        submitButton.addEventListener('click', async () => {
+            console.log('Submit button clicked');
+            const query = searchInput.value.trim();
+            
+            if (query) {
+                console.log('Submitting search query:', query);
+                
+                // Get references to elements
+                const exampleButton = document.getElementById('exampleButton');
+                const searchInputGroup = document.querySelector('.search-input-group');
+                const loadingContainer = document.getElementById('loadingContainer');
+                
+                // Store the query text for later use
+                const queryText = query;
+                
+                // 1. Fade out the example button, submit button, and search input text
+                exampleButton.classList.add('elements-fade-out');
+                submitButton.classList.add('elements-fade-out');
+                
+                // Add fade-out effect to the search input text while preserving the input element
+                searchInput.classList.add('elements-fade-out');
+                
+                // 2. Expand the search bar into a box
+                setTimeout(() => {
+                    // Hide the buttons completely
+                    exampleButton.style.display = 'none';
+                    submitButton.style.display = 'none';
+                    
+                    // Clear the search input text but keep the element
+                    searchInput.value = '';
+                    
+                    // Remove the fade-out class to make the input visible again
+                    searchInput.classList.remove('elements-fade-out');
+                    
+                    // Remove any inline styles
+                    searchInput.style = '';
+                    
+                    // Make sure the input is visible
+                    searchInput.style.opacity = '1';
+                    searchInput.style.visibility = 'visible';
+                    
+                    // Expand the search box
+                    searchInput.classList.add('search-box-expand');
+                    
+                    // 3. Show the loading animation
+                    setTimeout(() => {
+                        loadingContainer.classList.remove('hidden');
+                        loadingContainer.classList.add('visible');
+                    }, 500);
+                }, 500); // Increased timeout to allow fade-out to complete
+                
+                try {
+                    // Call the nutrition-retrieve-articles API
+                    const response = await fetch('https://nutrition-retrieve-articles-934163632848.us-central1.run.app', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            events_text: query,
+                            num_articles: 20
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log('API Response:', data);
+                    
+                    // 4. Hide the loading animation when the API call completes
+                    loadingContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        loadingContainer.classList.add('hidden');
+                    }, 500);
+                    
+                    // Process the results as needed
+                    // For now, just log to console as requested
+                    
+                } catch (error) {
+                    console.error('Error fetching nutrition articles:', error);
+                    
+                    // Hide loading animation on error too
+                    loadingContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        loadingContainer.classList.add('hidden');
+                    }, 500);
+                }
+            } else {
+                console.log('Empty search query, not submitting');
+            }
+        });
+    } else {
+        console.error('Submit button or search input not found');
+    }
+    
     // Make sure all slides are hidden first
     const allSlides = document.querySelectorAll('.slide');
     allSlides.forEach(slide => {
