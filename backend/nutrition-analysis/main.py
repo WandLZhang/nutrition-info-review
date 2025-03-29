@@ -17,10 +17,8 @@ from flask import jsonify, request, Response, stream_with_context
 import vertexai
 from google import genai
 from google.genai import types
-from google.cloud import bigquery
 import json
 import logging
-from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -33,9 +31,6 @@ genai_client = genai.Client(
     project="gemini-med-lit-review",
     location="us-central1",
 )
-bq_client = bigquery.Client(project="playground-439016")
-
-# We don't need to retrieve full articles since they're already provided by nutrition-retrieve-articles
 
 def create_nutrition_analysis_prompt(query, articles):
     """Create the prompt for nutrition analysis."""
@@ -185,25 +180,23 @@ def nutrition_analysis(request):
         def generate():
             try:
                 for chunk in response_stream:
-                    if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
-                        continue
-                    
-                    # Get the text from the chunk
-                    chunk_text = chunk.text
-                    logger.info(f"Received chunk: {chunk_text}")
-                    
-                    # Send the chunk directly without buffering
-                    yield f"data: {chunk_text}\n\n"
-                    
+                    if chunk.text:
+                        yield f"data: {json.dumps({'text': chunk.text})}\n\n"
+                        
             except Exception as e:
-                logger.error(f"Error in stream generation: {str(e)}")
-                yield f"data: Error: {str(e)}\n\n"
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
             
-            # End of stream
             yield "data: [DONE]\n\n"
 
-        # Return streaming response
-        return Response(stream_with_context(generate()), headers=headers)
+        return Response(
+            stream_with_context(generate()),
+            headers={
+                **headers,
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive'
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error in nutrition_analysis: {str(e)}")

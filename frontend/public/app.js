@@ -80,6 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Subtract a larger offset to ensure perfect alignment with the top of the card
                     const topPosition = slideCardRect.top - searchContainerRect.top - 20;
                     
+                    // Calculate the height to match the bottom of the slide card
+                    const slideCardHeight = slideCardRect.height;
+                    const slideCardBottom = slideCardRect.bottom - searchContainerRect.top;
+                    const boxHeight = slideCardBottom - topPosition;
+                    
                     // First, make it match the search bar exactly
                     outputBox.style.cssText = `
                         width: ${inputRect.width}px !important;
@@ -114,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Apply custom animation instead of using the class
                         outputBox.style.cssText = `
                             width: ${inputRect.width}px !important;
-                            height: 600px !important;
+                            height: ${boxHeight}px !important;
                             position: absolute !important;
                             top: ${topPosition}px !important;
                             left: ${searchInput.offsetLeft}px !important;
@@ -409,10 +414,10 @@ function displayPmcBoxes(data) {
         margin-top: 20px !important;
         padding: 15px !important;
         background-color: white !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+        border-radius: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
         width: 100% !important;
-        max-height: 400px !important;
         overflow-y: auto !important;
         display: none !important;
     `;
@@ -420,44 +425,7 @@ function displayPmcBoxes(data) {
     // Add the analysis container to the output box
     outputBox.appendChild(analysisContainer);
     
-    // Create a container for raw response debugging
-    const rawResponseContainer = document.createElement('div');
-    rawResponseContainer.id = 'rawResponseContainer';
-    rawResponseContainer.style.cssText = `
-        margin-top: 20px !important;
-        padding: 15px !important;
-        background-color: #f5f5f5 !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
-        width: 100% !important;
-        max-height: 200px !important;
-        overflow-y: auto !important;
-        display: none !important;
-        font-family: monospace !important;
-        white-space: pre-wrap !important;
-    `;
-    
-    // Add a title to the raw response container
-    const rawResponseTitle = document.createElement('div');
-    rawResponseTitle.textContent = 'Raw Response (for debugging):';
-    rawResponseTitle.style.cssText = `
-        font-weight: bold !important;
-        margin-bottom: 10px !important;
-    `;
-    rawResponseContainer.appendChild(rawResponseTitle);
-    
-    // Create a pre element for the raw response
-    const rawResponsePre = document.createElement('pre');
-    rawResponsePre.id = 'rawResponsePre';
-    rawResponsePre.style.cssText = `
-        margin: 0 !important;
-        padding: 0 !important;
-        font-size: 12px !important;
-    `;
-    rawResponseContainer.appendChild(rawResponsePre);
-    
-    // Add the raw response container to the output box
-    outputBox.appendChild(rawResponseContainer);
+    // Raw response container removed as requested
 }
 
 // Analyze articles using the nutrition-analysis endpoint
@@ -485,13 +453,15 @@ function analyzeArticles(articles, query) {
         display: flex !important;
         align-items: center !important;
         justify-content: flex-start !important;
-        gap: 15px !important;
-        margin-bottom: 15px !important;
+        gap: 8px !important;
+        margin: 0 !important;
         background-color: rgba(255, 255, 255, 0.8) !important;
-        padding: 10px !important;
+        padding: 2px 2px 2px 2px !important;
         border-radius: 5px !important;
         opacity: 1 !important;
         visibility: visible !important;
+        left: 0 !important;
+        top: 0 !important;
     `;
     
     // Create loading icon
@@ -561,73 +531,72 @@ function analyzeArticles(articles, query) {
                     return;
                 }
                 
-                        // Decode the chunk
-                        const chunk = decoder.decode(value, { stream: true });
-                        chunkCounter++;
+                // Decode the chunk
+                const chunk = decoder.decode(value, { stream: true });
+                chunkCounter++;
+                
+                // Log the raw chunk for debugging
+                console.log(`Raw chunk #${chunkCounter} received:`, chunk);
+                
+                // Process SSE events more robustly
+                // Match "data: " at the beginning of a line and capture everything after it
+                // Only stop at a new event that starts with a blank line followed by "data: "
+                const eventRegex = /^data: ([\s\S]+?)(?=\n\ndata: |$)/gm;
+                let match;
+                
+                while ((match = eventRegex.exec(chunk)) !== null) {
+                    const data = match[1].trim();
+                    if (!data) continue;
+                    
+                    console.log(`Processing SSE event from chunk #${chunkCounter}:`, data);
+                    
+                    // Store the chunk for later analysis
+                    allChunks.push({
+                        chunkNumber: chunkCounter,
+                        rawChunk: chunk,
+                        extractedData: data
+                    });
+                    
+                    // Check if it's the end marker
+                    if (data === '[DONE]') {
+                        console.log('End of stream detected');
+                        analysisLoadingContainer.style.display = 'none';
                         
-                        // Log the raw chunk for debugging
-                        console.log(`Raw chunk #${chunkCounter} received:`, chunk);
+                        // Log the complete response for comparison
+                        console.log('COMPLETE RESPONSE:', responseText);
+                        console.log('ALL CHUNKS:', allChunks);
                         
-                        // Process each line (Server-Sent Event format)
-                        const lines = chunk.split('\n\n');
-                        for (const line of lines) {
-                            if (!line.trim()) continue;
-                            
-                            console.log(`Processing line from chunk #${chunkCounter}:`, line);
-                            
-                            // Extract the data part (remove "data: " prefix)
-                            const dataMatch = line.match(/^data: (.+)$/m);
-                            if (dataMatch) {
-                                const data = dataMatch[1];
-                                console.log(`Extracted data from chunk #${chunkCounter}:`, data);
-                                
-                                // Store the chunk for later analysis
-                                allChunks.push({
-                                    chunkNumber: chunkCounter,
-                                    rawChunk: chunk,
-                                    extractedData: data
-                                });
-                                
-                                // Check if it's the end marker
-                                if (data === '[DONE]') {
-                                    console.log('End of stream detected');
-                                    analysisLoadingContainer.style.display = 'none';
-                                    
-                                    // Log the complete response for comparison
-                                    console.log('COMPLETE RESPONSE:', responseText);
-                                    console.log('ALL CHUNKS:', allChunks);
-                                    
-                                    return;
-                                }
-                                
-                                // Append the chunk to the response text
-                                responseText += data;
-                                
-                                // Update the response container
-                                responseContainer.innerHTML = responseText;
-                                console.log(`Updated response container with content from chunk #${chunkCounter}`);
-                                
-                                // Update the raw response container
-                                const rawResponseContainer = document.getElementById('rawResponseContainer');
-                                const rawResponsePre = document.getElementById('rawResponsePre');
-                                
-                                if (rawResponseContainer && rawResponsePre) {
-                                    // Show the raw response container
-                                    rawResponseContainer.style.display = 'block';
-                                    
-                                    // Append the raw data to the pre element with chunk number
-                                    rawResponsePre.textContent += `\n--- CHUNK #${chunkCounter} ---\n${data}`;
-                                    
-                                    // Auto-scroll the raw response container
-                                    rawResponseContainer.scrollTop = rawResponseContainer.scrollHeight;
-                                }
-                                
-                                // Auto-scroll to the bottom
-                                analysisContainer.scrollTop = analysisContainer.scrollHeight;
-                            } else {
-                                console.log('No data match found in line');
-                            }
+                        return;
+                    }
+                    
+                    // Parse the JSON data to extract the text property
+                    try {
+                        const jsonData = JSON.parse(data);
+                        if (jsonData.text) {
+                            // Append the text to the response text
+                            responseText += jsonData.text;
+                        } else if (data === '[DONE]') {
+                            // End marker, do nothing
+                        } else {
+                            // If no text property but not end marker, append the raw data
+                            responseText += data;
                         }
+                    } catch (e) {
+                        // If it's not valid JSON, just append the raw data
+                        console.warn('Failed to parse JSON, using raw data:', e);
+                        responseText += data;
+                    }
+                    
+                    // Use a markdown renderer to properly display the content
+                    // This preserves all formatting including newlines
+                    responseContainer.innerHTML = marked.parse(responseText);
+                    console.log(`Updated response container with content from chunk #${chunkCounter}`);
+                    
+                    // Raw response container code removed as requested
+                    
+                    // Auto-scroll to the bottom
+                    analysisContainer.scrollTop = analysisContainer.scrollHeight;
+                }
                 
                 // Continue processing the stream
                 return processStream();
