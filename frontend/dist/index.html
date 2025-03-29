@@ -3,37 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Patient Referral Match</title>
+    <title>Nutrition Info Review</title>
+    <link rel="stylesheet" href="tables-data.css">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
-  <link rel="stylesheet" crossorigin href="/assets/index-B5sJbaPr.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-C3fC1kTz.css">
 </head>
 <body>
     <div class="App">
-        <div class="streaming-console">
-            <main>
-                <div class="main-app-area">
-                    <div class="placeholder-message">
-                        Capture a medical encounter document. Press the camera button to start.
-                    </div>
-                    <video id="camera" class="stream hidden" playsinline autoplay></video>
+        <div class="slide-container">
+            <div class="slide" id="slide-1">
+                <div class="slide-card">
+                    <p>We want to revamp nutrition checking</p>
+                    <p>&nbsp;</p>
+                    <p>For both government and everyday Americans</p>
                 </div>
-                <section class="control-tray">
-                    <canvas style="display:none;"></canvas>
-                    <nav class="actions-nav">
-                        <button id="cameraToggle" class="action-button" data-label="Turn on camera">
-                            <span class="material-symbols-outlined">videocam</span>
+                <div class="slide-button" id="nextSlideButton">
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                </div>
+            </div>
+            <div class="slide hidden" id="slide-2">
+                <div class="slide-card">
+                    <p>Current search produces no results</p>
+                    <p>&nbsp;</p>
+                    <p>Or endless, abstract link trees</p>
+                </div>
+                <div class="slide-button" id="slide2Button">
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                </div>
+            </div>
+            <div class="slide hidden" id="slide-3">
+                <div class="slide-card">
+                    <p id="transition-text">Google's NutritionAI provides evidence transparently grounded in research</p>
+                </div>
+                <div class="search-container">
+                    <div class="search-input-group">
+                        <input type="text" class="search-bar" id="searchInput" placeholder="Search for nutrition information...">
+                        <button class="search-button example-button" id="exampleButton">Example</button>
+                        <button class="search-button submit-button" id="submitButton">
+                            <span class="material-symbols-outlined">arrow_forward</span>
                         </button>
-                        <button id="captureButton" class="action-button" disabled data-label="Take picture">
-                            <span class="material-symbols-outlined">camera</span>
-                        </button>
-                        <input type="file" id="fileInput" accept="image/*" class="file-input" style="display:none;">
-                        <label for="fileInput" class="action-button" data-label="Upload">
-                            <span class="material-symbols-outlined">upload</span>
-                        </label>
-                    </nav>
-                </section>
-            </main>
+                    </div>
+                <div class="loading-container hidden" id="loadingContainer">
+                    <div class="loading-icon">
+                        <span class="material-symbols-outlined">settings</span>
+                    </div>
+                    <div class="loading-text">
+                        <span>Finding evidence</span>
+                    </div>
+                </div>
+                </div>
+            </div>
         </div>
+        <!-- Streaming console removed -->
     </div>
     <div id="previewArea" class="preview-area hidden">
         <div class="results-layout">
@@ -48,87 +69,9 @@
                     </button>
                 </div>
             </div>
-            <div class="attributes-container">
-                <div id="attributesDisplay" class="attributes-display">
-                    <h3>DocAI + Gemini extracted these core attributes:</h3>
-                    <div id="attributeName">Name: <span></span></div>
-                    <div id="attributeDOB">Date of Birth: <span></span></div>
-                    <div id="attributeProcedureDate">Date of First Procedure: <span></span></div>
-                </div>
-                <div class="attributes-decision">
-                    <button id="editAttributesButton" class="action-button edit-button">
-                        <span class="material-symbols-outlined">edit</span>
-                    </button>
-                    <button id="submitAttributesButton" class="action-button submit-button">
-                        <span class="material-symbols-outlined">check</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <div class="candidates-section hidden" id="candidatesSection">
-            <div id="matchCandidatesContainer" class="match-candidates-container">
-                <h3>These are potential match candidates</h3>
-                <div class="candidates-table-container">
-                    <table class="candidates-table">
-                        <thead>
-                            <tr>
-                                <th>Patient Name</th>
-                                <th>Provisional Diagnosis</th>
-                                <th>Category of Care</th>
-                                <th>Service Requested</th>
-                                <th>Referral Date</th>
-                                <th>Referral Expiration Date</th>
-                            </tr>
-                        </thead>
-                        <tbody id="candidatesTableBody">
-                            <!-- Rows will be populated dynamically -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div id="rightArrow" class="right-arrow">
-                <span class="material-symbols-outlined">arrow_forward</span>
-            </div>
-        </div>
-        
-        <div class="embeddings-explanation hidden" id="embeddingsExplanation">
-            <h2 class="embeddings-title">There are still multiple referral matches.<br><br>How do we tie the document to the record with the right category?</h2>
-            <div class="embeddings-image-container">
-                <img src="/assets/embeddings-BZEdrAbA.png" alt="Embeddings visualization" class="embeddings-image">
-            </div>
-            <p class="embeddings-text">We use LLM embeddings to search the document contents against the referrals.</p>
-            <div id="embeddingsBlueArrow" class="blue-arrow">
-                <span class="material-symbols-outlined">arrow_forward</span>
-            </div>
-        </div>
-        
-        <div class="rankings-section hidden" id="rankingsSection">
-            <div class="preview-container">
-                <img id="rankingsImagePreview" alt="Captured document">
-            </div>
-            <div id="rankingsContainer" class="rankings-container">
-                <div class="rankings-card">
-                    <h3>Based on semantic search, here are the rankings of best matches</h3>
-                    <div class="candidates-table-container">
-                        <table class="candidates-table">
-                            <thead>
-                                <tr>
-                                    <th>Patient Name</th>
-                                    <th>Referring Facility</th>
-                                    <th>Service Requested</th>
-                                    <th>Semantic Distance</th>
-                                </tr>
-                            </thead>
-                            <tbody id="rankingsList">
-                                <!-- Rankings will be populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+            
+    <!-- Add marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

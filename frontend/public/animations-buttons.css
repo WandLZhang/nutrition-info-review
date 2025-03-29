@@ -196,6 +196,7 @@
   transition: all 0.3s ease;
   animation: fadeIn 1s forwards, expandWidth 1.5s forwards 0.5s;
   padding-right: 180px; /* Make room for the buttons */
+  font-family: var(--font-family);
 }
 
 .search-bar:focus {
@@ -206,6 +207,8 @@
 .search-bar::placeholder {
   color: #999;
   opacity: 0.7;
+  font-family: var(--font-family);
+  font-size: 16px;
 }
 
 /* Search Input Group */
@@ -312,6 +315,9 @@
   background-color: #f1f3f4;
   color: #5f6368;
   padding: 0 16px;
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: normal;
 }
 
 .example-button:hover {

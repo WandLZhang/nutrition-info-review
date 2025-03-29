@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "patient-referral-match",
+    "site": "nutrition-info-review",
     "public": "public",
     "ignore": [
       "firebase.json",
