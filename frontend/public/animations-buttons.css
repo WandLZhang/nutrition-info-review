@@ -28,6 +28,11 @@
   to { opacity: 1; }
 }
 
+@keyframes expandWidth {
+  from { width: 60%; }
+  to { width: 100%; }
+}
+
 @keyframes pulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.1); }
@@ -90,6 +95,32 @@
 
 .fade-in {
   animation: fadeIn 0.8s forwards;
+}
+
+/* Search Bar Styles */
+.search-bar {
+  width: 60%;
+  height: 50px;
+  padding: 0 20px;
+  font-size: 18px;
+  border: none;
+  border-radius: 25px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  color: #333;
+  outline: none;
+  transition: all 0.3s ease;
+  animation: fadeIn 1s forwards, expandWidth 1.5s forwards 0.5s;
+}
+
+.search-bar:focus {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  width: 100%;
+}
+
+.search-bar::placeholder {
+  color: #999;
+  opacity: 0.7;
 }
 
 /* Control Tray Styles */
@@ -626,6 +657,42 @@
 
 /* Active state - make arrow appear pressed */
 .blue-arrow:active .material-symbols-outlined {
+  transform: scale(0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Slide Button */
+.slide-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  right: 10%;
+  bottom: 15%;
+  opacity: 1;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.slide-button .material-symbols-outlined {
+  font-size: 3rem;
+  color: white;
+  background-color: #1a73e8; /* Blue color */
+  border-radius: 50%;
+  padding: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+/* Hover state - make button slightly larger with enhanced shadow */
+.slide-button:hover .material-symbols-outlined {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Active state - make button appear pressed */
+.slide-button:active .material-symbols-outlined {
   transform: scale(0.95);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }

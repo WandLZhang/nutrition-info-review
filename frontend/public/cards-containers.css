@@ -1,110 +1,5 @@
 /* Cards and Containers CSS */
 
-/* Authentication Container */
-.auth-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-.auth-container.visible {
-  opacity: 1;
-  visibility: visible;
-}
-
-.auth-popup {
-  background: var(--Neutral-00);
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-  transform: translateY(-20px);
-  opacity: 0;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.auth-container.visible .auth-popup {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.auth-popup h2 {
-  color: var(--Neutral-80);
-  font-family: var(--font-heading);
-  font-size: 24px;
-  margin-bottom: 16px;
-}
-
-.auth-popup p {
-  color: var(--Neutral-60);
-  margin-bottom: 24px;
-  line-height: 1.5;
-}
-
-/* Profile Container */
-.profile-container {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 100;
-}
-
-.profile-menu {
-  position: absolute;
-  top: 48px;
-  right: 0;
-  background: var(--Neutral-00);
-  border: 1px solid var(--Neutral-20);
-  border-radius: 8px;
-  padding: 8px;
-  min-width: 200px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  padding: 8px;
-  gap: 8px;
-  border-bottom: 1px solid var(--Neutral-20);
-  margin-bottom: 8px;
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 16px;
-  object-fit: cover;
-}
-
-.user-email {
-  color: var(--Neutral-80);
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#userAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
 /* Preview Area Styles */
 .preview-area {
   position: fixed;
@@ -464,100 +359,6 @@
   font-family: var(--font-heading);
 }
 
-/* Logger */
-.logger {
-  color: var(--gray-500);
-  width: 100%;
-  max-width: 100%;
-  display: block;
-}
-
-.logger-list {
-  padding: 0 0px 0 25px;
-  overflow-x: hidden;
-  width: calc(100% - 45px);
-}
-
-.rich-log {
-  display: block;
-}
-
-.rich-log h4 {
-  font-size: 14px;
-  text-transform: uppercase;
-  padding: 8px 0;
-  margin: 0;
-  font-family: var(--font-heading);
-  color: var(--Neutral-60);
-}
-
-.rich-log h5 {
-  margin: 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--Neutral-20);
-  font-family: var(--font-heading);
-  color: var(--Neutral-80);
-}
-
-.rich-log .part {
-  background: var(--Neutral-5);
-  padding: 14px;
-  margin-bottom: 4px;
-  color: var(--Neutral-80);
-  border-radius: 8px;
-}
-
-.plain-log {
-  display: block;
-  padding: 8px 0;
-  color: var(--Neutral-50);
-  font-family: "Space Mono";
-  font-size: 14px;
-  font-weight: 400;
-  line-height: normal;
-}
-
-.plain-log > * {
-  padding-right: 4px;
-}
-
-.plain-log .timestamp {
-  width: 70px;
-  flex-grow: 0;
-  flex-shrink: 0;
-  color: var(--Neutral-50);
-}
-
-.plain-log .source {
-  flex-shrink: 0;
-  font-weight: bold;
-}
-
-.source-server,
-.receive {
-  color: var(--Blue-500);
-}
-
-.source-client,
-.send:not(.source-server) {
-  color: var(--Green-500);
-}
-
-.count {
-  background-color: var(--Neutral-5);
-  font-size: x-small;
-  padding: 0.3em 0.5em;
-  line-height: 1em;
-  vertical-align: middle;
-  border-radius: 8px;
-  color: var(--Blue-500);
-}
-
-/* Side Panel (Hidden) */
-.side-panel {
-  display: none !important;
-}
-
 /* Tooltip Styling */
 .detail-tooltip {
   position: absolute;
@@ -588,4 +389,115 @@
 .tooltip-content div {
   font-size: 14px;
   line-height: 1.4;
+}
+
+/* Slide Container Styles */
+.slide-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+}
+
+/* Individual Slide */
+.slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* First Slide */
+#slide-1 {
+  background-image: url('slide_1.png');
+  background-color: rgba(255, 255, 255, 0.3); /* Reduce the opacity to make image less faded */
+  background-blend-mode: overlay; /* Change blend mode for better visibility */
+  animation: fadeIn 1.5s forwards; /* Add fade-in animation to the background */
+}
+
+/* Second Slide */
+#slide-2 {
+  background-image: url('slide_2.png');
+  background-color: rgba(255, 255, 255, 0.3);
+  background-blend-mode: overlay;
+  animation: fadeIn 1.5s forwards;
+}
+
+/* Third Slide */
+#slide-3 {
+  background-image: url('slide_1.png');
+  background-color: rgba(255, 255, 255, 0.3);
+  background-blend-mode: overlay;
+  animation: fadeIn 1.5s forwards;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Search Container */
+.search-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 600px;
+  opacity: 0;
+  animation: fadeIn 1.5s forwards 0.5s;
+}
+
+/* Hide slides */
+.slide.hidden {
+  display: none !important;
+  animation: none !important;
+  opacity: 0 !important;
+}
+
+/* Background fade-in animation */
+@keyframes bgFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Apply background fade-in animation to the slide */
+.slide {
+  opacity: 0;
+  animation: bgFadeIn 1.5s forwards;
+}
+
+/* Slide Card */
+.slide-card {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 2.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  min-height: 400px; /* Make it a tall rectangle */
+  text-align: left;
+  opacity: 0; /* Start hidden for fade-in effect */
+  animation: fadeIn 1.5s forwards;
+  animation-delay: 0.5s; /* Delay the fade-in slightly for better effect */
+  position: absolute;
+  right: 10%; /* Position on the right side */
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.slide-card p {
+  font-family: var(--font-heading);
+  font-size: 1.8rem;
+  color: var(--Neutral-80);
+  line-height: 1.4;
+  font-weight: 500;
+  margin: 0.5rem 0;
 }
