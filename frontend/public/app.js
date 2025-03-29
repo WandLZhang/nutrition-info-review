@@ -57,13 +57,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const outputBox = document.createElement('div');
                     outputBox.id = 'outputBox';
                     
-                    // Get the position of the search input and card container
+                    // Copy the position and dimensions of the search input
                     const inputRect = searchInput.getBoundingClientRect();
-                    const cardContainer = document.querySelector('.slide-card');
-                    const cardContainerRect = cardContainer ? cardContainer.getBoundingClientRect() : null;
                     
-                    // Use the card container's top position if available, otherwise use the search input's position
-                    const topPosition = cardContainerRect ? cardContainerRect.top : searchInput.offsetTop;
+                    // Get the position of the slide-card in slide-3
+                    const slideCard = document.querySelector('#slide-3 .slide-card');
+                    const slideCardRect = slideCard.getBoundingClientRect();
+                    const searchContainerRect = document.querySelector('.search-container').getBoundingClientRect();
+                    
+                    // Calculate the top position relative to the search container
+                    // Subtract a larger offset to ensure perfect alignment with the top of the card
+                    const topPosition = slideCardRect.top - searchContainerRect.top - 20;
                     
                     // First, make it match the search bar exactly
                     outputBox.style.cssText = `
@@ -117,16 +121,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // Get the position of the output box
                     const outputBoxRect = outputBox.getBoundingClientRect();
-                    const searchContainerRect = document.querySelector('.search-container').getBoundingClientRect();
                     
-                    // Calculate the position relative to the search container
-                    const topOffset = outputBoxRect.top - searchContainerRect.top + 20;
-                    const leftOffset = outputBoxRect.left - searchContainerRect.left + 20;
-                    
-                    // Position the loading container relative to the search input
+                    // Position the loading container relative to the slide card
                     loadingContainer.style.position = 'absolute';
-                    loadingContainer.style.top = `${topOffset}px`;
-                    loadingContainer.style.left = `${leftOffset}px`;
+                    loadingContainer.style.top = `${topPosition + 20}px`; // Add padding to position it inside the expanded box
+                    loadingContainer.style.left = `${searchInput.offsetLeft + 20}px`; // Add padding from the left edge
                     loadingContainer.style.zIndex = '1000';
                     
                     // 3. Show the loading animation
