@@ -582,6 +582,17 @@ function analyzeArticles(articles, query) {
                             if (chunkCounter === 1 || responseText.trim().length > 0) {
                                 analysisLoadingContainer.style.display = 'none';
                                 console.log('Hiding analysis loading container after first text chunk');
+                                
+                                // Change the transition text when the analyzing loading animation fades away
+                                const transitionText = document.getElementById('transition-text');
+                                if (transitionText) {
+                                    transitionText.classList.add('text-transition');
+                                    
+                                    // Change the text content when the opacity is 0 (middle of the animation)
+                                    setTimeout(() => {
+                                        transitionText.textContent = "Validate user confusion about previous guidelines";
+                                    }, 800); // 800ms is 40% of the 2s animation duration
+                                }
                             }
                         } else if (data === '[DONE]') {
                             // End marker, do nothing

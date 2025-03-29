@@ -101,7 +101,7 @@ def analyze_with_gemini_stream(prompt):
     generate_content_config = types.GenerateContentConfig(
         temperature=0.2,
         top_p=0.8,
-        max_output_tokens=1024,
+        max_output_tokens=8192,
         response_modalities=["TEXT"],
         safety_settings=[
             types.SafetySetting(category=cat, threshold="OFF")
