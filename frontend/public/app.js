@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Apply custom animation instead of using the class
                         outputBox.style.cssText = `
                             width: ${inputRect.width}px !important;
-                            height: 400px !important;
+                            height: 600px !important;
                             position: absolute !important;
                             top: ${topPosition}px !important;
                             left: ${searchInput.offsetLeft}px !important;
@@ -174,6 +174,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // 5. Display the PMC boxes in a grid
                     displayPmcBoxes(data);
+                    
+                    // 6. Call the nutrition analysis endpoint with the articles and query
+                    analyzeArticles(data, queryText);
                     
                 } catch (error) {
                     console.error('Error fetching nutrition articles:', error);
@@ -398,4 +401,249 @@ function displayPmcBoxes(data) {
             boxLink.style.transform = 'translateY(0)';
         }, i * 50); // 50ms delay between each box animation
     }
+    
+    // Create a container for the analysis response
+    const analysisContainer = document.createElement('div');
+    analysisContainer.id = 'analysisContainer';
+    analysisContainer.style.cssText = `
+        margin-top: 20px !important;
+        padding: 15px !important;
+        background-color: white !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+        width: 100% !important;
+        max-height: 400px !important;
+        overflow-y: auto !important;
+        display: none !important;
+    `;
+    
+    // Add the analysis container to the output box
+    outputBox.appendChild(analysisContainer);
+    
+    // Create a container for raw response debugging
+    const rawResponseContainer = document.createElement('div');
+    rawResponseContainer.id = 'rawResponseContainer';
+    rawResponseContainer.style.cssText = `
+        margin-top: 20px !important;
+        padding: 15px !important;
+        background-color: #f5f5f5 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+        width: 100% !important;
+        max-height: 200px !important;
+        overflow-y: auto !important;
+        display: none !important;
+        font-family: monospace !important;
+        white-space: pre-wrap !important;
+    `;
+    
+    // Add a title to the raw response container
+    const rawResponseTitle = document.createElement('div');
+    rawResponseTitle.textContent = 'Raw Response (for debugging):';
+    rawResponseTitle.style.cssText = `
+        font-weight: bold !important;
+        margin-bottom: 10px !important;
+    `;
+    rawResponseContainer.appendChild(rawResponseTitle);
+    
+    // Create a pre element for the raw response
+    const rawResponsePre = document.createElement('pre');
+    rawResponsePre.id = 'rawResponsePre';
+    rawResponsePre.style.cssText = `
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 12px !important;
+    `;
+    rawResponseContainer.appendChild(rawResponsePre);
+    
+    // Add the raw response container to the output box
+    outputBox.appendChild(rawResponseContainer);
+}
+
+// Analyze articles using the nutrition-analysis endpoint
+function analyzeArticles(articles, query) {
+    console.log('Analyzing articles with query:', query);
+    
+    // Get the output box and create a new loading container for analysis
+    const outputBox = document.getElementById('outputBox');
+    const analysisContainer = document.getElementById('analysisContainer');
+    
+    if (!outputBox || !analysisContainer) {
+        console.error('Output box or analysis container not found');
+        return;
+    }
+    
+    // Show the analysis container
+    analysisContainer.style.display = 'block';
+    
+    // Create a loading container for the analysis
+    const analysisLoadingContainer = document.createElement('div');
+    analysisLoadingContainer.className = 'loading-container';
+    analysisLoadingContainer.id = 'analysisLoadingContainer';
+    analysisLoadingContainer.style.cssText = `
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 15px !important;
+        margin-bottom: 15px !important;
+        background-color: rgba(255, 255, 255, 0.8) !important;
+        padding: 10px !important;
+        border-radius: 5px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    `;
+    
+    // Create loading icon
+    const loadingIcon = document.createElement('div');
+    loadingIcon.className = 'loading-icon';
+    loadingIcon.innerHTML = '<span class="material-symbols-outlined">settings</span>';
+    analysisLoadingContainer.appendChild(loadingIcon);
+    
+    // Create loading text
+    const loadingText = document.createElement('div');
+    loadingText.className = 'loading-text';
+    loadingText.innerHTML = '<span>Analyzing</span>';
+    analysisLoadingContainer.appendChild(loadingText);
+    
+    // Add the loading container to the analysis container
+    analysisContainer.appendChild(analysisLoadingContainer);
+    
+    // Create a container for the streamed response
+    const responseContainer = document.createElement('div');
+    responseContainer.id = 'responseContainer';
+    responseContainer.className = 'markdown-content';
+    responseContainer.style.cssText = `
+        width: 100% !important;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #333 !important;
+    `;
+    
+    // Add the response container to the analysis container
+    analysisContainer.appendChild(responseContainer);
+    
+    // Make the POST request to start the analysis and handle streaming response
+    let responseText = '';
+    let chunkCounter = 0;
+    let allChunks = [];
+    
+    console.log('Starting API call to nutrition-analysis endpoint');
+    console.log('Request payload:', { query, articlesCount: articles.length });
+    
+    // Use fetch with streaming response handling
+    fetch('https://nutrition-analysis-934163632848.us-central1.run.app', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({
+            query: query,
+            articles: articles
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        // Get a reader from the response body stream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        // Function to process the stream chunks
+        function processStream() {
+            return reader.read().then(({ done, value }) => {
+                // If the stream is done, hide the loading container
+                if (done) {
+                    analysisLoadingContainer.style.display = 'none';
+                    return;
+                }
+                
+                        // Decode the chunk
+                        const chunk = decoder.decode(value, { stream: true });
+                        chunkCounter++;
+                        
+                        // Log the raw chunk for debugging
+                        console.log(`Raw chunk #${chunkCounter} received:`, chunk);
+                        
+                        // Process each line (Server-Sent Event format)
+                        const lines = chunk.split('\n\n');
+                        for (const line of lines) {
+                            if (!line.trim()) continue;
+                            
+                            console.log(`Processing line from chunk #${chunkCounter}:`, line);
+                            
+                            // Extract the data part (remove "data: " prefix)
+                            const dataMatch = line.match(/^data: (.+)$/m);
+                            if (dataMatch) {
+                                const data = dataMatch[1];
+                                console.log(`Extracted data from chunk #${chunkCounter}:`, data);
+                                
+                                // Store the chunk for later analysis
+                                allChunks.push({
+                                    chunkNumber: chunkCounter,
+                                    rawChunk: chunk,
+                                    extractedData: data
+                                });
+                                
+                                // Check if it's the end marker
+                                if (data === '[DONE]') {
+                                    console.log('End of stream detected');
+                                    analysisLoadingContainer.style.display = 'none';
+                                    
+                                    // Log the complete response for comparison
+                                    console.log('COMPLETE RESPONSE:', responseText);
+                                    console.log('ALL CHUNKS:', allChunks);
+                                    
+                                    return;
+                                }
+                                
+                                // Append the chunk to the response text
+                                responseText += data;
+                                
+                                // Update the response container
+                                responseContainer.innerHTML = responseText;
+                                console.log(`Updated response container with content from chunk #${chunkCounter}`);
+                                
+                                // Update the raw response container
+                                const rawResponseContainer = document.getElementById('rawResponseContainer');
+                                const rawResponsePre = document.getElementById('rawResponsePre');
+                                
+                                if (rawResponseContainer && rawResponsePre) {
+                                    // Show the raw response container
+                                    rawResponseContainer.style.display = 'block';
+                                    
+                                    // Append the raw data to the pre element with chunk number
+                                    rawResponsePre.textContent += `\n--- CHUNK #${chunkCounter} ---\n${data}`;
+                                    
+                                    // Auto-scroll the raw response container
+                                    rawResponseContainer.scrollTop = rawResponseContainer.scrollHeight;
+                                }
+                                
+                                // Auto-scroll to the bottom
+                                analysisContainer.scrollTop = analysisContainer.scrollHeight;
+                            } else {
+                                console.log('No data match found in line');
+                            }
+                        }
+                
+                // Continue processing the stream
+                return processStream();
+            });
+        }
+        
+        // Start processing the stream
+        return processStream();
+    })
+    .catch(error => {
+        console.error('Error with streaming response:', error);
+        
+        // Hide the loading container
+        analysisLoadingContainer.style.display = 'none';
+        
+        // Show error message
+        responseContainer.innerHTML = '<p style="color: red;">Error loading analysis. Please try again.</p>';
+    });
 }
