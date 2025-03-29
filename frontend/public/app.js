@@ -350,7 +350,7 @@ function displayPmcBoxes(data) {
     pmcGridContainer.className = 'pmc-grid-container';
     pmcGridContainer.style.cssText = `
         background-color: transparent !important;
-        padding: 10px !important;
+        padding: 10px 10px 5px 10px !important;
         width: 100% !important;
     `;
     
@@ -411,8 +411,8 @@ function displayPmcBoxes(data) {
     const analysisContainer = document.createElement('div');
     analysisContainer.id = 'analysisContainer';
     analysisContainer.style.cssText = `
-        margin-top: 20px !important;
-        padding: 15px !important;
+        margin-top: 5px !important;
+        padding: 10px !important;
         background-color: white !important;
         border-radius: 0 !important;
         border: none !important;
@@ -575,6 +575,12 @@ function analyzeArticles(articles, query) {
                         if (jsonData.text) {
                             // Append the text to the response text
                             responseText += jsonData.text;
+                            
+                            // Hide the loading animation after the first text chunk is displayed
+                            if (chunkCounter === 1 || responseText.trim().length > 0) {
+                                analysisLoadingContainer.style.display = 'none';
+                                console.log('Hiding analysis loading container after first text chunk');
+                            }
                         } else if (data === '[DONE]') {
                             // End marker, do nothing
                         } else {
