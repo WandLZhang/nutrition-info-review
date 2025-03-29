@@ -434,7 +434,7 @@
 /* Third Slide */
 #slide-3 {
   background-image: url('slide_1.png');
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.7);
   background-blend-mode: overlay;
   animation: fadeIn 1.5s forwards;
   display: flex;
@@ -451,6 +451,23 @@
   max-width: 600px;
   opacity: 0;
   animation: fadeIn 1.5s forwards 0.5s;
+  margin-left: -400px; /* Move search bar to the left */
+}
+
+/* Search Bar */
+.search-bar {
+  padding: 12px 16px;
+  border-radius: 24px;
+  border: 1px solid #e0e0e0;
+  font-size: 16px;
+  width: 100%;
+  outline: none;
+  box-shadow: 0 0 8px 2px rgba(66, 133, 244, 0.5); /* Blue shadow */
+  transition: box-shadow 0.3s ease;
+}
+
+.search-bar:focus {
+  box-shadow: 0 0 12px 4px rgba(66, 133, 244, 0.7); /* Stronger blue shadow on focus */
 }
 
 /* Hide slides */

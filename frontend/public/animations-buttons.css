@@ -18,6 +18,27 @@
   to { opacity: 0; visibility: hidden; }
 }
 
+@keyframes slideCardFadeOut {
+  0% { 
+    opacity: 1;
+  }
+  100% { 
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Apply to the slide container */
+.slide-transitioning .slide-card {
+  animation: slideCardFadeOut 0.8s ease-out forwards !important;
+  pointer-events: none;
+}
+
+/* Apply to the slide background */
+.slide-transitioning {
+  animation: fadeOut 0.8s ease-out forwards !important;
+}
+
 @keyframes slideLeft {
   from { transform: translate(-50%, -50%); }
   to { transform: translate(-80%, -50%); }
@@ -105,22 +126,85 @@
   font-size: 18px;
   border: none;
   border-radius: 25px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 8px 2px rgba(66, 133, 244, 0.5); /* Blue shadow */
   background-color: white;
   color: #333;
   outline: none;
   transition: all 0.3s ease;
   animation: fadeIn 1s forwards, expandWidth 1.5s forwards 0.5s;
+  padding-right: 180px; /* Make room for the buttons */
 }
 
 .search-bar:focus {
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 12px 4px rgba(66, 133, 244, 0.7); /* Stronger blue shadow on focus */
   width: 100%;
 }
 
 .search-bar::placeholder {
   color: #999;
   opacity: 0.7;
+}
+
+/* Search Input Group */
+.search-input-group {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  position: relative;
+}
+
+/* Search Buttons */
+.search-button {
+  position: absolute;
+  height: 36px;
+  border: none;
+  border-radius: 18px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  opacity: 0; /* Start hidden */
+  animation: fadeIn 0.5s forwards; /* Fade in animation */
+  animation-delay: 2s; /* Wait for search bar animation to complete (1s fade + 0.5s delay + 1.5s expand = ~2s) */
+}
+
+.search-button:hover {
+  transform: translateY(-1px);
+}
+
+.search-button:active {
+  transform: translateY(1px);
+}
+
+/* Example Button */
+.example-button {
+  right: 60px;
+  background-color: #f1f3f4;
+  color: #5f6368;
+  padding: 0 16px;
+}
+
+.example-button:hover {
+  background-color: #e8eaed;
+}
+
+/* Submit Button */
+.search-button.submit-button {
+  right: 10px;
+  background-color: #4285f4;
+  color: white;
+  width: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.search-button.submit-button:hover {
+  background-color: #1a73e8;
+}
+
+.search-button.submit-button .material-symbols-outlined {
+  font-size: 20px;
 }
 
 /* Control Tray Styles */
