@@ -68,7 +68,9 @@ Based on the user query and the PubMed articles provided, please create a compre
 
 FORMAT YOUR RESPONSE:
 - Use markdown formatting throughout
-- Cite evidence from articles using numbered references: [1](https://pubmed.ncbi.nlm.nih.gov/PMID/), [2](https://pubmed.ncbi.nlm.nih.gov/PMID/)
+- ALWAYS cite evidence from articles using clickable links in this exact format: [PMID](https://pubmed.ncbi.nlm.nih.gov/PMID/)
+- For example: [12345678](https://pubmed.ncbi.nlm.nih.gov/12345678/), [87654321](https://pubmed.ncbi.nlm.nih.gov/87654321/)
+- DO NOT use formats like [number, PMID: xxxxx] or any other non-clickable citation format
 - DO NOT use section headers
 - **Bold key conclusions based on the evidence**
 - **Bold any points where current government guidelines might cause confusion or contradict evidence**

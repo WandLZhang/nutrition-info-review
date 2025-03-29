@@ -76,14 +76,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const slideCardRect = slideCard.getBoundingClientRect();
                     const searchContainerRect = document.querySelector('.search-container').getBoundingClientRect();
                     
-                    // Calculate the top position relative to the search container
-                    // Subtract a larger offset to ensure perfect alignment with the top of the card
-                    const topPosition = slideCardRect.top - searchContainerRect.top - 20;
-                    
-                    // Calculate the height to match the bottom of the slide card
+                    // Calculate the height to be taller than the slide card height
                     const slideCardHeight = slideCardRect.height;
-                    const slideCardBottom = slideCardRect.bottom - searchContainerRect.top;
-                    const boxHeight = slideCardBottom - topPosition;
+                    const boxHeight = slideCardHeight * 1.2; // 120% of the slide card height
+                    
+                    // Calculate the top position to vertically center the expanded box with the slide card
+                    // Get the center point of the slide card
+                    const slideCardCenter = slideCardRect.top + (slideCardRect.height / 2) - searchContainerRect.top;
+                    // Calculate the top position by subtracting half the height of the expanded box
+                    // Apply an additional offset to shift it up (reduced from 50px to 20px)
+                    const topPosition = slideCardCenter - (boxHeight / 2) - 20; // Shift up by 20px
                     
                     // First, make it match the search bar exactly
                     outputBox.style.cssText = `
@@ -600,8 +602,9 @@ function analyzeArticles(articles, query) {
                     
                     // Raw response container code removed as requested
                     
-                    // Auto-scroll to the bottom
+                    // Auto-scroll both containers to the bottom
                     analysisContainer.scrollTop = analysisContainer.scrollHeight;
+                    outputBox.scrollTop = outputBox.scrollHeight;
                 }
                 
                 // Continue processing the stream
