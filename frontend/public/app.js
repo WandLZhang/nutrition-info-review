@@ -36,9 +36,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const exampleButton = document.getElementById('exampleButton');
                 const searchInputGroup = document.querySelector('.search-input-group');
                 const loadingContainer = document.getElementById('loadingContainer');
+                const transitionText = document.getElementById('transition-text');
                 
                 // Store the query text for later use
                 const queryText = query;
+                
+                // Trigger the text transition
+                if (transitionText) {
+                    transitionText.classList.add('text-transition');
+                    
+                    // Change the text content when the opacity is 0 (middle of the animation)
+                    setTimeout(() => {
+                        transitionText.textContent = "The search will always have guaranteed hits";
+                    }, 800); // 800ms is 40% of the 2s animation duration
+                }
                 
                 // 1. Fade out the example button, submit button, and search input text
                 exampleButton.classList.add('elements-fade-out');
