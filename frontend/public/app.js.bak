@@ -1,0 +1,904 @@
+// DOM Elements for slides
+console.log('App.js loaded - Nutrition Info Review', new Date().toISOString());
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM fully loaded');
+    
+    // Initialize the slide view
+    console.log('Initializing slide view for nutrition info review');
+    
+    // Add event listener for the example button
+    const exampleButton = document.getElementById('exampleButton');
+    const searchInput = document.getElementById('searchInput');
+    
+    if (exampleButton && searchInput) {
+        console.log('Found example button and search input, adding event listener');
+        exampleButton.addEventListener('click', () => {
+            console.log('Example button clicked');
+            searchInput.value = "Are saturated fats really bad?";
+            searchInput.focus();
+        });
+    }
+    
+    // Add event listener for the submit button
+    const submitButton = document.getElementById('submitButton');
+    if (submitButton && searchInput) {
+        console.log('Found submit button, adding event listener');
+        submitButton.addEventListener('click', async () => {
+            console.log('Submit button clicked');
+            const query = searchInput.value.trim();
+            
+            if (query) {
+                console.log('Submitting search query:', query);
+                
+                // Get references to elements
+                const exampleButton = document.getElementById('exampleButton');
+                const searchInputGroup = document.querySelector('.search-input-group');
+                const loadingContainer = document.getElementById('loadingContainer');
+                
+                // Store the query text for later use
+                const queryText = query;
+                
+                // 1. Fade out the example button, submit button, and search input text
+                exampleButton.classList.add('elements-fade-out');
+                submitButton.classList.add('elements-fade-out');
+                
+                // Add fade-out effect to the search input text while preserving the input element
+                searchInput.classList.add('elements-fade-out');
+                
+                // 2. Expand the search bar into a box (non-editable)
+                setTimeout(() => {
+                    // Hide the buttons completely
+                    exampleButton.style.display = 'none';
+                    submitButton.style.display = 'none';
+                    
+                    // Create a new div element to replace the input
+                    const outputBox = document.createElement('div');
+                    outputBox.id = 'outputBox';
+                    outputBox.className = 'search-box-expand';
+                    
+                    // Copy the position and dimensions of the search input
+                    const inputRect = searchInput.getBoundingClientRect();
+                    outputBox.style.width = `${inputRect.width}px`;
+                    outputBox.style.height = `${inputRect.height}px`;
+                    outputBox.style.position = 'absolute';
+                    outputBox.style.top = `${searchInput.offsetTop}px`;
+                    outputBox.style.left = `${searchInput.offsetLeft}px`;
+                    outputBox.style.backgroundColor = 'white';
+                    outputBox.style.borderRadius = '24px';
+                    outputBox.style.border = '1px solid #e0e0e0';
+                    outputBox.style.boxShadow = '0 0 8px 2px rgba(66, 133, 244, 0.5)';
+                    
+                    // Hide the original search input
+                    searchInput.style.display = 'none';
+                    
+                    // Add the output box to the search input's parent
+                    searchInput.parentNode.appendChild(outputBox);
+                    
+                    // Get the position of the output box
+                    const outputBoxRect = outputBox.getBoundingClientRect();
+                    const searchContainerRect = document.querySelector('.search-container').getBoundingClientRect();
+                    
+                    // Calculate the position relative to the search container
+                    const topOffset = outputBoxRect.top - searchContainerRect.top + 20;
+                    const leftOffset = outputBoxRect.left - searchContainerRect.left + 20;
+                    
+                    // Position the loading container relative to the search input
+                    loadingContainer.style.position = 'absolute';
+                    loadingContainer.style.top = `${topOffset}px`;
+                    loadingContainer.style.left = `${leftOffset}px`;
+                    loadingContainer.style.zIndex = '1000';
+                    
+                    // 3. Show the loading animation
+                    setTimeout(() => {
+                        loadingContainer.classList.remove('hidden');
+                        loadingContainer.classList.add('visible');
+                    }, 500);
+                }, 500); // Increased timeout to allow fade-out to complete
+                
+                try {
+                    // Call the nutrition-retrieve-articles API
+                    const response = await fetch('https://nutrition-retrieve-articles-934163632848.us-central1.run.app', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            events_text: query,
+                            num_articles: 20
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log('API Response:', data);
+                    
+                    // 4. Hide the loading animation when the API call completes
+                    loadingContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        loadingContainer.classList.add('hidden');
+                    }, 500);
+                    
+                    // 5. Display the PMC boxes in a grid
+                    displayPmcBoxes(data);
+                    
+                } catch (error) {
+                    console.error('Error fetching nutrition articles:', error);
+                    
+                    // Hide loading animation on error too
+                    loadingContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        loadingContainer.classList.add('hidden');
+                    }, 500);
+                }
+            } else {
+                console.log('Empty search query, not submitting');
+            }
+        });
+    } else {
+        console.error('Submit button or search input not found');
+    }
+    
+    // Make sure all slides are hidden first
+    const allSlides = document.querySelectorAll('.slide');
+    allSlides.forEach(slide => {
+        slide.classList.add('hidden');
+    });
+    
+    // Ensure only slide 1 is visible initially
+    const slide1 = document.getElementById('slide-1');
+    if (slide1) {
+        console.log('Found slide-1, making it visible');
+        slide1.classList.remove('hidden');
+    } else {
+        console.error('Slide 1 not found');
+    }
+    
+    // Add event listener for the next slide button
+    const nextSlideButton = document.getElementById('nextSlideButton');
+    if (nextSlideButton) {
+        console.log('Found next slide button, adding event listener');
+        nextSlideButton.addEventListener('click', () => {
+            console.log('Next slide button clicked');
+            
+            // Get the slide element
+            const slide = document.getElementById('slide-1');
+            console.log('Slide element:', slide);
+            
+            if (slide) {
+                // Add the transitioning class to the slide to trigger the card fade-out
+                slide.classList.add('slide-transitioning');
+                console.log('Added slide-transitioning class');
+                
+                // Get the slide card element to listen for animation end
+                const slideCard = slide.querySelector('.slide-card');
+                
+                if (slideCard) {
+                    // Listen for the animation to end before changing slides
+                    slideCard.addEventListener('animationend', function animationEndHandler(event) {
+                        console.log('Animation ended:', event.animationName);
+                        
+                        // Remove the event listener to prevent multiple triggers
+                        slideCard.removeEventListener('animationend', animationEndHandler);
+                        
+                        // Navigate to the next slide
+                        navigateToSlide(2);
+                    });
+                }
+                
+                // Fallback in case animation event doesn't fire
+                setTimeout(() => {
+                    console.log('Fallback timeout triggered');
+                    navigateToSlide(2);
+                }, 1000); // 1 second fallback
+            } else {
+                console.error('Slide element not found');
+                // Navigate anyway if we can't find the slide
+                navigateToSlide(2);
+            }
+        });
+    } else {
+        console.error('Next slide button not found');
+    }
+    
+    // Add event listener for slide 2 button
+    const slide2Button = document.getElementById('slide2Button');
+    if (slide2Button) {
+        console.log('Found slide 2 button, adding event listener');
+        slide2Button.addEventListener('click', () => {
+            console.log('Slide 2 button clicked');
+            
+            // Get the slide element
+            const slide = document.getElementById('slide-2');
+            console.log('Slide element:', slide);
+            
+            if (slide) {
+                // Add the transitioning class to the slide to trigger the card fade-out
+                slide.classList.add('slide-transitioning');
+                console.log('Added slide-transitioning class');
+                
+                // Get the slide card element to listen for animation end
+                const slideCard = slide.querySelector('.slide-card');
+                
+                if (slideCard) {
+                    // Listen for the animation to end before changing slides
+                    slideCard.addEventListener('animationend', function animationEndHandler(event) {
+                        console.log('Animation ended:', event.animationName);
+                        
+                        // Remove the event listener to prevent multiple triggers
+                        slideCard.removeEventListener('animationend', animationEndHandler);
+                        
+                        // Navigate to the next slide
+                        navigateToSlide(3);
+                    });
+                }
+                
+                // Fallback in case animation event doesn't fire
+                setTimeout(() => {
+                    console.log('Fallback timeout triggered');
+                    navigateToSlide(3);
+                }, 1000); // 1 second fallback
+            } else {
+                console.error('Slide element not found');
+                // Navigate anyway if we can't find the slide
+                navigateToSlide(3);
+            }
+        });
+    } else {
+        console.error('Slide 2 button not found');
+    }
+});
+
+// Slide Navigation
+function navigateToSlide(slideNumber) {
+    console.log(`Navigating to slide ${slideNumber}`);
+    
+    // Hide all slides
+    const slides = document.querySelectorAll('.slide');
+    slides.forEach(slide => {
+        slide.classList.add('hidden');
+    });
+    
+    // Show the target slide
+    const targetSlide = document.getElementById(`slide-${slideNumber}`);
+    if (targetSlide) {
+        console.log(`Found slide-${slideNumber}, removing hidden class`);
+        targetSlide.classList.remove('hidden');
+    } else {
+        console.error(`Slide ${slideNumber} not found`);
+    }
+}
+
+// Display PMC Boxes in a grid
+function displayPmcBoxes(data) {
+    console.log('Displaying PMC boxes for', data.length, 'articles');
+    
+    // Get the output box and search container
+    const outputBox = document.getElementById('outputBox');
+    const searchContainer = document.querySelector('.search-container');
+    
+    if (!outputBox || !searchContainer) {
+        console.error('Output box or search container not found');
+        return;
+    }
+// DOM Elements for slides
+console.log('App.js loaded - Nutrition Info Review', new Date().toISOString());
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM fully loaded');
+    
+    // Initialize the slide view
+    console.log('Initializing slide view for nutrition info review');
+    
+    // Add event listener for the example button
+    const exampleButton = document.getElementById('exampleButton');
+    const searchInput = document.getElementById('searchInput');
+    
+    if (exampleButton && searchInput) {
+        console.log('Found example button and search input, adding event listener');
+        exampleButton.addEventListener('click', () => {
+            console.log('Example button clicked');
+            searchInput.value = "Are saturated fats really bad?";
+            searchInput.focus();
+        });
+    }
+    
+    // Add event listener for the submit button
+    const submitButton = document.getElementById('submitButton');
+    if (submitButton && searchInput) {
+        console.log('Found submit button, adding event listener');
+        submitButton.addEventListener('click', async () => {
+            console.log('Submit button clicked');
+            const query = searchInput.value.trim();
+            
+            if (query) {
+                console.log('Submitting search query:', query);
+                
+                // Get references to elements
+                const exampleButton = document.getElementById('exampleButton');
+                const searchInputGroup = document.querySelector('.search-input-group');
+                const loadingContainer = document.getElementById('loadingContainer');
+                
+                // Store the query text for later use
+                const queryText = query;
+                
+                // 1. Fade out the example button, submit button, and search input text
+                exampleButton.classList.add('elements-fade-out');
+                submitButton.classList.add('elements-fade-out');
+                
+                // Add fade-out effect to the search input text while preserving the input element
+                searchInput.classList.add('elements-fade-out');
+                
+                // 2. Expand the search bar into a box (non-editable)
+                setTimeout(() => {
+                    // Hide the buttons completely
+                    exampleButton.style.display = 'none';
+                    submitButton.style.display = 'none';
+                    
+                    // Create a new div element to replace the input
+                    const outputBox = document.createElement('div');
+                    outputBox.id = 'outputBox';
+                    outputBox.className = 'search-box-expand';
+                    
+                    // Copy the position and dimensions of the search input
+                    const inputRect = searchInput.getBoundingClientRect();
+                    outputBox.style.width = `${inputRect.width}px`;
+                    outputBox.style.height = `${inputRect.height}px`;
+                    outputBox.style.position = 'absolute';
+                    outputBox.style.top = `${searchInput.offsetTop}px`;
+                    outputBox.style.left = `${searchInput.offsetLeft}px`;
+                    outputBox.style.backgroundColor = 'white';
+                    outputBox.style.borderRadius = '24px';
+                    outputBox.style.border = '1px solid #e0e0e0';
+                    outputBox.style.boxShadow = '0 0 8px 2px rgba(66, 133, 244, 0.5)';
+                    
+                    // Hide the original search input
+                    searchInput.style.display = 'none';
+                    
+                    // Add the output box to the search input's parent
+                    searchInput.parentNode.appendChild(outputBox);
+                    
+                    // Get the position of the output box
+                    const outputBoxRect = outputBox.getBoundingClientRect();
+                    const searchContainerRect = document.querySelector('.search-container').getBoundingClientRect();
+                    
+                    // Calculate the position relative to the search container
+                    const topOffset = outputBoxRect.top - searchContainerRect.top + 20;
+                    const leftOffset = outputBoxRect.left - searchContainerRect.left + 20;
+                    
+                    // Position the loading container relative to the search input
+                    loadingContainer.style.position = 'absolute';
+                    loadingContainer.style.top = `${topOffset}px`;
+                    loadingContainer.style.left = `${leftOffset}px`;
+                    loadingContainer.style.zIndex = '1000';
+                    
+                    // 3. Show the loading animation
+                    setTimeout(() => {
+                        loadingContainer.classList.remove('hidden');
+                        loadingContainer.classList.add('visible');
+                    }, 500);
+                }, 500); // Increased timeout to allow fade-out to complete
+                
+                try {
+                    // Call the nutrition-retrieve-articles API
+                    const response = await fetch('https://nutrition-retrieve-articles-934163632848.us-central1.run.app', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            events_text: query,
+                            num_articles: 20
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log('API Response:', data);
+                    
+                    // 4. Hide the loading animation when the API call completes
+                    loadingContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        loadingContainer.classList.add('hidden');
+                    }, 500);
+                    
+                    // 5. Display the PMC boxes in a grid
+                    displayPmcBoxes(data);
+                    
+                } catch (error) {
+                    console.error('Error fetching nutrition articles:', error);
+                    
+                    // Hide loading animation on error too
+                    loadingContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        loadingContainer.classList.add('hidden');
+                    }, 500);
+                }
+            } else {
+                console.log('Empty search query, not submitting');
+            }
+        });
+    } else {
+        console.error('Submit button or search input not found');
+    }
+    
+    // Make sure all slides are hidden first
+    const allSlides = document.querySelectorAll('.slide');
+    allSlides.forEach(slide => {
+        slide.classList.add('hidden');
+    });
+    
+    // Ensure only slide 1 is visible initially
+    const slide1 = document.getElementById('slide-1');
+    if (slide1) {
+        console.log('Found slide-1, making it visible');
+        slide1.classList.remove('hidden');
+    } else {
+        console.error('Slide 1 not found');
+    }
+    
+    // Add event listener for the next slide button
+    const nextSlideButton = document.getElementById('nextSlideButton');
+    if (nextSlideButton) {
+        console.log('Found next slide button, adding event listener');
+        nextSlideButton.addEventListener('click', () => {
+            console.log('Next slide button clicked');
+            
+            // Get the slide element
+            const slide = document.getElementById('slide-1');
+            console.log('Slide element:', slide);
+            
+            if (slide) {
+                // Add the transitioning class to the slide to trigger the card fade-out
+                slide.classList.add('slide-transitioning');
+                console.log('Added slide-transitioning class');
+                
+                // Get the slide card element to listen for animation end
+                const slideCard = slide.querySelector('.slide-card');
+                
+                if (slideCard) {
+                    // Listen for the animation to end before changing slides
+                    slideCard.addEventListener('animationend', function animationEndHandler(event) {
+                        console.log('Animation ended:', event.animationName);
+                        
+                        // Remove the event listener to prevent multiple triggers
+                        slideCard.removeEventListener('animationend', animationEndHandler);
+                        
+                        // Navigate to the next slide
+                        navigateToSlide(2);
+                    });
+                }
+                
+                // Fallback in case animation event doesn't fire
+                setTimeout(() => {
+                    console.log('Fallback timeout triggered');
+                    navigateToSlide(2);
+                }, 1000); // 1 second fallback
+            } else {
+                console.error('Slide element not found');
+                // Navigate anyway if we can't find the slide
+                navigateToSlide(2);
+            }
+        });
+    } else {
+        console.error('Next slide button not found');
+    }
+    
+    // Add event listener for slide 2 button
+    const slide2Button = document.getElementById('slide2Button');
+    if (slide2Button) {
+        console.log('Found slide 2 button, adding event listener');
+        slide2Button.addEventListener('click', () => {
+            console.log('Slide 2 button clicked');
+            
+            // Get the slide element
+            const slide = document.getElementById('slide-2');
+            console.log('Slide element:', slide);
+            
+            if (slide) {
+                // Add the transitioning class to the slide to trigger the card fade-out
+                slide.classList.add('slide-transitioning');
+                console.log('Added slide-transitioning class');
+                
+                // Get the slide card element to listen for animation end
+                const slideCard = slide.querySelector('.slide-card');
+                
+                if (slideCard) {
+                    // Listen for the animation to end before changing slides
+                    slideCard.addEventListener('animationend', function animationEndHandler(event) {
+                        console.log('Animation ended:', event.animationName);
+                        
+                        // Remove the event listener to prevent multiple triggers
+                        slideCard.removeEventListener('animationend', animationEndHandler);
+                        
+                        // Navigate to the next slide
+                        navigateToSlide(3);
+                    });
+                }
+                
+                // Fallback in case animation event doesn't fire
+                setTimeout(() => {
+                    console.log('Fallback timeout triggered');
+                    navigateToSlide(3);
+                }, 1000); // 1 second fallback
+            } else {
+                console.error('Slide element not found');
+                // Navigate anyway if we can't find the slide
+                navigateToSlide(3);
+            }
+        });
+    } else {
+        console.error('Slide 2 button not found');
+    }
+});
+
+// Slide Navigation
+function navigateToSlide(slideNumber) {
+    console.log(`Navigating to slide ${slideNumber}`);
+    
+    // Hide all slides
+    const slides = document.querySelectorAll('.slide');
+    slides.forEach(slide => {
+        slide.classList.add('hidden');
+    });
+    
+    // Show the target slide
+    const targetSlide = document.getElementById(`slide-${slideNumber}`);
+    if (targetSlide) {
+        console.log(`Found slide-${slideNumber}, removing hidden class`);
+        targetSlide.classList.remove('hidden');
+    } else {
+        console.error(`Slide ${slideNumber} not found`);
+    }
+}
+
+// DOM Elements for slides
+console.log('App.js loaded - Nutrition Info Review', new Date().toISOString());
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM fully loaded');
+    
+    // Initialize the slide view
+    console.log('Initializing slide view for nutrition info review');
+    
+    // Add event listener for the example button
+    const exampleButton = document.getElementById('exampleButton');
+    const searchInput = document.getElementById('searchInput');
+    
+    if (exampleButton && searchInput) {
+        console.log('Found example button and search input, adding event listener');
+        exampleButton.addEventListener('click', () => {
+            console.log('Example button clicked');
+            searchInput.value = "Are saturated fats really bad?";
+            searchInput.focus();
+        });
+    }
+    
+    // Add event listener for the submit button
+    const submitButton = document.getElementById('submitButton');
+    if (submitButton && searchInput) {
+        console.log('Found submit button, adding event listener');
+        submitButton.addEventListener('click', async () => {
+            console.log('Submit button clicked');
+            const query = searchInput.value.trim();
+            
+            if (query) {
+                console.log('Submitting search query:', query);
+                
+                // Get references to elements
+                const exampleButton = document.getElementById('exampleButton');
+                const searchInputGroup = document.querySelector('.search-input-group');
+                const loadingContainer = document.getElementById('loadingContainer');
+                
+                // Store the query text for later use
+                const queryText = query;
+                
+                // 1. Fade out the example button, submit button, and search input text
+                exampleButton.classList.add('elements-fade-out');
+                submitButton.classList.add('elements-fade-out');
+                
+                // Add fade-out effect to the search input text while preserving the input element
+                searchInput.classList.add('elements-fade-out');
+                
+                // 2. Expand the search bar into a box (non-editable)
+                setTimeout(() => {
+                    // Hide the buttons completely
+                    exampleButton.style.display = 'none';
+                    submitButton.style.display = 'none';
+                    
+                    // Create a new div element to replace the input
+                    const outputBox = document.createElement('div');
+                    outputBox.id = 'outputBox';
+                    outputBox.className = 'search-box-expand';
+                    
+                    // Copy the position and dimensions of the search input
+                    const inputRect = searchInput.getBoundingClientRect();
+                    outputBox.style.width = `${inputRect.width}px`;
+                    outputBox.style.height = `${inputRect.height}px`;
+                    outputBox.style.position = 'absolute';
+                    outputBox.style.top = `${searchInput.offsetTop}px`;
+                    outputBox.style.left = `${searchInput.offsetLeft}px`;
+                    outputBox.style.backgroundColor = 'white';
+                    outputBox.style.borderRadius = '24px';
+                    outputBox.style.border = '1px solid #e0e0e0';
+                    outputBox.style.boxShadow = '0 0 8px 2px rgba(66, 133, 244, 0.5)';
+                    
+                    // Hide the original search input
+                    searchInput.style.display = 'none';
+                    
+                    // Add the output box to the search input's parent
+                    searchInput.parentNode.appendChild(outputBox);
+                    
+                    // Get the position of the output box
+                    const outputBoxRect = outputBox.getBoundingClientRect();
+                    const searchContainerRect = document.querySelector('.search-container').getBoundingClientRect();
+                    
+                    // Calculate the position relative to the search container
+                    const topOffset = outputBoxRect.top - searchContainerRect.top + 20;
+                    const leftOffset = outputBoxRect.left - searchContainerRect.left + 20;
+                    
+                    // Position the loading container relative to the search input
+                    loadingContainer.style.position = 'absolute';
+                    loadingContainer.style.top = `${topOffset}px`;
+                    loadingContainer.style.left = `${leftOffset}px`;
+                    loadingContainer.style.zIndex = '1000';
+                    
+                    // 3. Show the loading animation
+                    setTimeout(() => {
+                        loadingContainer.classList.remove('hidden');
+                        loadingContainer.classList.add('visible');
+                    }, 500);
+                }, 500); // Increased timeout to allow fade-out to complete
+                
+                try {
+                    // Call the nutrition-retrieve-articles API
+                    const response = await fetch('https://nutrition-retrieve-articles-934163632848.us-central1.run.app', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            events_text: query,
+                            num_articles: 20
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log('API Response:', data);
+                    
+                    // 4. Hide the loading animation when the API call completes
+                    loadingContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        loadingContainer.classList.add('hidden');
+                    }, 500);
+                    
+                    // 5. Display the PMC boxes in a grid
+                    displayPmcBoxes(data);
+                    
+                } catch (error) {
+                    console.error('Error fetching nutrition articles:', error);
+                    
+                    // Hide loading animation on error too
+                    loadingContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        loadingContainer.classList.add('hidden');
+                    }, 500);
+                }
+            } else {
+                console.log('Empty search query, not submitting');
+            }
+        });
+    } else {
+        console.error('Submit button or search input not found');
+    }
+    
+    // Make sure all slides are hidden first
+    const allSlides = document.querySelectorAll('.slide');
+    allSlides.forEach(slide => {
+        slide.classList.add('hidden');
+    });
+    
+    // Ensure only slide 1 is visible initially
+    const slide1 = document.getElementById('slide-1');
+    if (slide1) {
+        console.log('Found slide-1, making it visible');
+        slide1.classList.remove('hidden');
+    } else {
+        console.error('Slide 1 not found');
+    }
+    
+    // Add event listener for the next slide button
+    const nextSlideButton = document.getElementById('nextSlideButton');
+    if (nextSlideButton) {
+        console.log('Found next slide button, adding event listener');
+        nextSlideButton.addEventListener('click', () => {
+            console.log('Next slide button clicked');
+            
+            // Get the slide element
+            const slide = document.getElementById('slide-1');
+            console.log('Slide element:', slide);
+            
+            if (slide) {
+                // Add the transitioning class to the slide to trigger the card fade-out
+                slide.classList.add('slide-transitioning');
+                console.log('Added slide-transitioning class');
+                
+                // Get the slide card element to listen for animation end
+                const slideCard = slide.querySelector('.slide-card');
+                
+                if (slideCard) {
+                    // Listen for the animation to end before changing slides
+                    slideCard.addEventListener('animationend', function animationEndHandler(event) {
+                        console.log('Animation ended:', event.animationName);
+                        
+                        // Remove the event listener to prevent multiple triggers
+                        slideCard.removeEventListener('animationend', animationEndHandler);
+                        
+                        // Navigate to the next slide
+                        navigateToSlide(2);
+                    });
+                }
+                
+                // Fallback in case animation event doesn't fire
+                setTimeout(() => {
+                    console.log('Fallback timeout triggered');
+                    navigateToSlide(2);
+                }, 1000); // 1 second fallback
+            } else {
+                console.error('Slide element not found');
+                // Navigate anyway if we can't find the slide
+                navigateToSlide(2);
+            }
+        });
+    } else {
+        console.error('Next slide button not found');
+    }
+    
+    // Add event listener for slide 2 button
+    const slide2Button = document.getElementById('slide2Button');
+    if (slide2Button) {
+        console.log('Found slide 2 button, adding event listener');
+        slide2Button.addEventListener('click', () => {
+            console.log('Slide 2 button clicked');
+            
+            // Get the slide element
+            const slide = document.getElementById('slide-2');
+            console.log('Slide element:', slide);
+            
+            if (slide) {
+                // Add the transitioning class to the slide to trigger the card fade-out
+                slide.classList.add('slide-transitioning');
+                console.log('Added slide-transitioning class');
+                
+                // Get the slide card element to listen for animation end
+                const slideCard = slide.querySelector('.slide-card');
+                
+                if (slideCard) {
+                    // Listen for the animation to end before changing slides
+                    slideCard.addEventListener('animationend', function animationEndHandler(event) {
+                        console.log('Animation ended:', event.animationName);
+                        
+                        // Remove the event listener to prevent multiple triggers
+                        slideCard.removeEventListener('animationend', animationEndHandler);
+                        
+                        // Navigate to the next slide
+                        navigateToSlide(3);
+                    });
+                }
+                
+                // Fallback in case animation event doesn't fire
+                setTimeout(() => {
+                    console.log('Fallback timeout triggered');
+                    navigateToSlide(3);
+                }, 1000); // 1 second fallback
+            } else {
+                console.error('Slide element not found');
+                // Navigate anyway if we can't find the slide
+                navigateToSlide(3);
+            }
+        });
+    } else {
+        console.error('Slide 2 button not found');
+    }
+});
+
+// Slide Navigation
+function navigateToSlide(slideNumber) {
+    console.log(`Navigating to slide ${slideNumber}`);
+    
+    // Hide all slides
+    const slides = document.querySelectorAll('.slide');
+    slides.forEach(slide => {
+        slide.classList.add('hidden');
+    });
+    
+    // Show the target slide
+    const targetSlide = document.getElementById(`slide-${slideNumber}`);
+    if (targetSlide) {
+        console.log(`Found slide-${slideNumber}, removing hidden class`);
+        targetSlide.classList.remove('hidden');
+    } else {
+        console.error(`Slide ${slideNumber} not found`);
+    }
+}
+
+// Display PMC Boxes in a grid
+function displayPmcBoxes(data) {
+    console.log('Displaying PMC boxes for', data.length, 'articles');
+    
+    // Get the expanded search box and search container
+    const searchInput = document.getElementById('searchInput');
+    const searchContainer = document.querySelector('.search-container');
+    
+    if (!searchInput || !searchInput.classList.contains('search-box-expand') || !searchContainer) {
+        console.error('Expanded search box or search container not found');
+        return;
+    }
+    
+    // Remove any existing PMC grid
+    const existingGrid = document.querySelector('.pmc-grid-container');
+    if (existingGrid) {
+        existingGrid.remove();
+    }
+    
+    // Create a container for the PMC grid
+    const pmcGridContainer = document.createElement('div');
+    pmcGridContainer.className = 'pmc-grid-container';
+    
+    // Position the grid container above the expanded search box
+    const searchInputRect = searchInput.getBoundingClientRect();
+    const searchContainerRect = searchContainer.getBoundingClientRect();
+    
+    // Calculate the position relative to the search container
+    const topOffset = searchInputRect.top - searchContainerRect.top - 20; // Position above the search box
+    const leftOffset = searchInputRect.left - searchContainerRect.left;
+    
+    pmcGridContainer.style.position = 'absolute';
+    pmcGridContainer.style.top = `${topOffset}px`;
+    pmcGridContainer.style.left = `${leftOffset}px`;
+    pmcGridContainer.style.width = `${searchInputRect.width}px`;
+    pmcGridContainer.style.zIndex = '1000';
+    
+    // Create the grid inside the container
+    const pmcGrid = document.createElement('div');
+    pmcGrid.className = 'pmc-grid';
+    pmcGridContainer.appendChild(pmcGrid);
+    
+    // Add the grid container to the search container
+    searchContainer.appendChild(pmcGridContainer);
+    
+    // Create a box for each article (up to 20)
+    const maxArticles = Math.min(data.length, 20);
+    
+    for (let i = 0; i < maxArticles; i++) {
+        const article = data[i];
+        
+        // Create a link element for the box
+        const boxLink = document.createElement('a');
+        boxLink.className = 'pmc-box';
+        boxLink.href = `https://pubmed.ncbi.nlm.nih.gov/${article.pmid}/`;
+        boxLink.target = '_blank'; // Open in new tab
+        boxLink.textContent = article.name; // PMC number (PMCID)
+        
+        // Add the box to the grid
+        pmcGrid.appendChild(boxLink);
+        
+        // Apply the animation with a staggered delay
+        setTimeout(() => {
+            boxLink.classList.add('animate');
+        }, i * 50); // 50ms delay between each box animation
+    }
+}

@@ -47,27 +47,87 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Add fade-out effect to the search input text while preserving the input element
                 searchInput.classList.add('elements-fade-out');
                 
-                // 2. Expand the search bar into a box
+                // 2. Expand the search bar into a box (non-editable)
                 setTimeout(() => {
                     // Hide the buttons completely
                     exampleButton.style.display = 'none';
                     submitButton.style.display = 'none';
                     
-                    // Clear the search input text but keep the element
-                    searchInput.value = '';
+                    // Create a new div element to replace the input
+                    const outputBox = document.createElement('div');
+                    outputBox.id = 'outputBox';
                     
-                    // Remove the fade-out class to make the input visible again
-                    searchInput.classList.remove('elements-fade-out');
+                    // Get the position of the search input and card container
+                    const inputRect = searchInput.getBoundingClientRect();
+                    const cardContainer = document.querySelector('.slide-card');
+                    const cardContainerRect = cardContainer ? cardContainer.getBoundingClientRect() : null;
                     
-                    // Remove any inline styles
-                    searchInput.style = '';
+                    // Use the card container's top position if available, otherwise use the search input's position
+                    const topPosition = cardContainerRect ? cardContainerRect.top : searchInput.offsetTop;
                     
-                    // Make sure the input is visible
-                    searchInput.style.opacity = '1';
-                    searchInput.style.visibility = 'visible';
+                    // First, make it match the search bar exactly
+                    outputBox.style.cssText = `
+                        width: ${inputRect.width}px !important;
+                        height: ${inputRect.height}px !important;
+                        position: absolute !important;
+                        top: ${topPosition}px !important;
+                        left: ${searchInput.offsetLeft}px !important;
+                        background-color: white !important;
+                        border-radius: 25px !important;
+                        border: none !important;
+                        box-shadow: 0 0 8px 2px rgba(66, 133, 244, 0.5) !important;
+                        transition: all 0.8s ease !important;
+                        opacity: 0 !important;
+                        overflow: hidden !important;
+                        z-index: 100 !important;
+                    `;
                     
-                    // Expand the search box
-                    searchInput.classList.add('search-box-expand');
+                    // Hide the original search input
+                    searchInput.style.display = 'none';
+                    
+                    // Add the output box to the search input's parent
+                    searchInput.parentNode.appendChild(outputBox);
+                    
+                    // Trigger reflow to ensure the initial styles are applied before animation
+                    void outputBox.offsetWidth;
+                    
+                    // Fade in the output box
+                    outputBox.style.opacity = '1 !important';
+                    
+                    // After a short delay, start the expansion animation
+                    setTimeout(() => {
+                        // Apply custom animation instead of using the class
+                        outputBox.style.cssText = `
+                            width: ${inputRect.width}px !important;
+                            height: 400px !important;
+                            position: absolute !important;
+                            top: ${topPosition}px !important;
+                            left: ${searchInput.offsetLeft}px !important;
+                            background-color: white !important;
+                            border-radius: 8px !important;
+                            border: none !important;
+                            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+                            transition: all 0.8s ease !important;
+                            opacity: 1 !important;
+                            overflow: auto !important;
+                            z-index: 100 !important;
+                            padding: 20px !important;
+                        `;
+                    }, 100);
+                    
+                    // Get the position of the output box
+                    const outputBoxRect = outputBox.getBoundingClientRect();
+                    const searchContainerRect = document.querySelector('.search-container').getBoundingClientRect();
+                    
+                    // Calculate the position relative to the search container
+                    const topOffset = outputBoxRect.top - searchContainerRect.top + 20;
+                    const leftOffset = outputBoxRect.left - searchContainerRect.left + 20;
+                    
+                    // Position the loading container relative to the search input
+                    loadingContainer.style.position = 'absolute';
+                    loadingContainer.style.top = `${topOffset}px`;
+                    loadingContainer.style.left = `${leftOffset}px`;
+                    loadingContainer.style.zIndex = '1000';
                     
                     // 3. Show the loading animation
                     setTimeout(() => {
@@ -102,8 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         loadingContainer.classList.add('hidden');
                     }, 500);
                     
-                    // Process the results as needed
-                    // For now, just log to console as requested
+                    // 5. Display the PMC boxes in a grid
+                    displayPmcBoxes(data);
                     
                 } catch (error) {
                     console.error('Error fetching nutrition articles:', error);
@@ -249,5 +309,83 @@ function navigateToSlide(slideNumber) {
         targetSlide.classList.remove('hidden');
     } else {
         console.error(`Slide ${slideNumber} not found`);
+    }
+}
+
+// Display PMC Boxes in a grid
+function displayPmcBoxes(data) {
+    console.log('Displaying PMC boxes for', data.length, 'articles');
+    
+    // Get the output box
+    const outputBox = document.getElementById('outputBox');
+    
+    if (!outputBox) {
+        console.error('Output box not found');
+        return;
+    }
+    
+    // Clear any existing content in the output box
+    outputBox.innerHTML = '';
+    
+    // Create a container for the PMC grid
+    const pmcGridContainer = document.createElement('div');
+    pmcGridContainer.className = 'pmc-grid-container';
+    pmcGridContainer.style.cssText = `
+        background-color: transparent !important;
+        padding: 10px !important;
+        width: 100% !important;
+    `;
+    
+    // Create the grid inside the container
+    const pmcGrid = document.createElement('div');
+    pmcGrid.className = 'pmc-grid';
+    pmcGrid.style.cssText = `
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 15px !important;
+        width: 100% !important;
+    `;
+    pmcGridContainer.appendChild(pmcGrid);
+    
+    // Add the grid container directly to the output box
+    outputBox.appendChild(pmcGridContainer);
+    
+    // Create a box for each article (up to 20)
+    const maxArticles = Math.min(data.length, 20);
+    
+    for (let i = 0; i < maxArticles; i++) {
+        const article = data[i];
+        
+        // Create a link element for the box
+        const boxLink = document.createElement('a');
+        boxLink.style.cssText = `
+            background-color: white !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+            padding: 15px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            color: #4285f4 !important;
+            text-decoration: none !important;
+            transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+            opacity: 0 !important;
+            transform: translateY(10px) !important;
+        `;
+        boxLink.href = `https://pubmed.ncbi.nlm.nih.gov/${article.pmid}/`;
+        boxLink.target = '_blank'; // Open in new tab
+        boxLink.textContent = article.name; // PMC number (PMCID)
+        
+        // Add the box to the grid
+        pmcGrid.appendChild(boxLink);
+        
+        // Apply the animation with a staggered delay
+        setTimeout(() => {
+            boxLink.style.opacity = '1';
+            boxLink.style.transform = 'translateY(0)';
+        }, i * 50); // 50ms delay between each box animation
     }
 }

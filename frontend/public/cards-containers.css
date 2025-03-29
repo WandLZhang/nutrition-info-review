@@ -452,6 +452,7 @@
   opacity: 0;
   animation: fadeIn 1.5s forwards 0.5s;
   margin-left: -400px; /* Move search bar to the left */
+  position: relative; /* Add position relative for absolute positioning of children */
 }
 
 /* Search Bar */
@@ -517,4 +518,59 @@
   line-height: 1.4;
   font-weight: 500;
   margin: 0.5rem 0;
+}
+
+/* PMC Grid Container */
+.pmc-grid-container {
+  background-color: transparent;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+/* PMC Grid */
+.pmc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  width: 100%;
+}
+
+/* PMC Box Styles */
+.pmc-box {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4285f4;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.pmc-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Sequential Fade-in Animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pmc-box.animate {
+  animation: fadeInUp 0.3s ease forwards;
 }
