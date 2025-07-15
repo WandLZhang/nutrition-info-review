@@ -16,3 +16,5 @@ __pycache__
 firebase-debug.log*
 frontend/firebase-debug.log
 frontend/.firebase/hosting.cHVibGlj.cache
+.DS_Store
+frontend/.firebase/hosting.cHVibGlj.cache
